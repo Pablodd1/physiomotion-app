@@ -103,7 +103,7 @@ async function searchCPTCodes(db: any, keywords: string[]): Promise<CPTCode[]> {
     .slice(0, 5)
     .map(() => `(cpt_code LIKE ? OR code_description LIKE ? OR commonly_used_for LIKE ?)`)
     .join(' OR ');
-  
+
   const params = keywords
     .slice(0, 5)
     .flatMap(k => [`%${k}%`, `%${k}%`, `%${k}%`]);
@@ -126,8 +126,8 @@ async function searchCPTCodes(db: any, keywords: string[]): Promise<CPTCode[]> {
 }
 
 async function searchICD10Codes(
-  db: any, 
-  keywords: string[], 
+  db: any,
+  keywords: string[],
   bodyRegions?: string[]
 ): Promise<ICD10Code[]> {
   if (keywords.length === 0) return [];
@@ -136,7 +136,7 @@ async function searchICD10Codes(
     .slice(0, 5)
     .map(() => `(icd10_code LIKE ? OR code_description LIKE ? OR commonly_used_for LIKE ?)`)
     .join(' OR ');
-  
+
   const params = keywords
     .slice(0, 5)
     .flatMap(k => [`%${k}%`, `%${k}%`, `%${k}%`]);
@@ -163,7 +163,7 @@ async function searchICD10Codes(
 }
 
 async function searchGuidelines(
-  db: any, 
+  db: any,
   keywords: string[],
   bodyRegions?: string[]
 ): Promise<ClinicalGuideline[]> {
@@ -173,7 +173,7 @@ async function searchGuidelines(
     .slice(0, 5)
     .map(() => `(guideline_title LIKE ? OR content LIKE ? OR topic LIKE ?)`)
     .join(' OR ');
-  
+
   const params = keywords
     .slice(0, 5)
     .flatMap(k => [`%${k}%`, `%${k}%`, `%${k}%`]);
@@ -199,12 +199,12 @@ async function searchGuidelines(
 }
 
 async function generateRecommendations(
-  db: any, 
+  db: any,
   deficiencies: string[]
 ): Promise<string[]> {
   const recommendations: string[] = [];
 
-  const deficiencyKeywords = {
+  const deficiencyKeywords: Record<string, string[]> = {
     'Ankle Dorsiflexion': ['ankle mobility', 'gait', 'squat depth'],
     'Hip Flexion': ['hip mobility', 'lumbar spine', 'squat'],
     'Shoulder Flexion': ['shoulder ROM', 'overhead reach'],
@@ -215,15 +215,16 @@ async function generateRecommendations(
 
   for (const deficiency of deficiencies) {
     const keywords = deficiencyKeywords[deficiency] || [deficiency.toLowerCase()];
-    
+
+    const firstKeyword = keywords[0];
     const { results } = await db.prepare(`
-      SELECT guideline_title, recommendations
+      SELECT guideline_title, content as recommendations
       FROM clinical_guidelines 
       WHERE topic IN (${keywords.map(() => '?').join(',')})
          OR guideline_title LIKE ?
-         OR body_region LIKE ?
+         OR topic LIKE ?
       LIMIT 3
-    `).bind(...keywords, ...keywords.map(k => `%${k}%`), ...keywords.map(k => `%${k}%`)).all();
+    `).bind(...keywords, `%${firstKeyword}%`, `%${firstKeyword}%`).all();
 
     if (results && results.length > 0) {
       for (const r of results) {
@@ -238,7 +239,7 @@ async function generateRecommendations(
 }
 
 function buildAnswer(
-  query: string, 
+  query: string,
   results: EnhancedRAGResult,
   context: any
 ): string {
@@ -321,7 +322,7 @@ export async function suggestBillingCodes(
     SELECT cpt_code, code_description, code_category, medicare_2025_rate
     FROM cpt_codes WHERE cpt_code = ?
   `).bind(evalCode).all();
-  
+
   if (evalResults?.[0]) codes.push(evalResults[0]);
 
   // Add therapeutic codes based on deficiencies
@@ -332,7 +333,7 @@ export async function suggestBillingCodes(
     ORDER BY medicare_2025_rate DESC
     LIMIT 3
   `).all();
-  
+
   if (therapeuticResults) codes.push(...therapeuticResults.slice(0, 3));
 
   return codes;

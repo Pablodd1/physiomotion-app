@@ -1,7 +1,7 @@
 // Enhanced Joint Tracking System
 // Maximum Accuracy Implementation for Orbbec Femto Mega & MediaPipe
 
-import type { PoseLandmark, JointAngle, SkeletonData } from '../types';
+import type { PoseLandmark, JointAngle, SkeletonData, ClinicalJointAngle } from '../types';
 
 // ============================================================================
 // CONFIGURATION
@@ -74,7 +74,7 @@ class MovingAverageFilter {
   update(value: number): number {
     this.window[this.index] = value;
     this.index = (this.index + 1) % this.windowSize;
-    
+
     if (this.index === 0) this.filled = true;
 
     const count = this.filled ? this.windowSize : this.index;
@@ -110,7 +110,7 @@ class OutlierDetector {
     );
 
     const zScore = Math.abs((value - mean) / (std || 1));
-    
+
     this.history.push(value);
     if (this.history.length > this.maxHistory) {
       this.history.shift();
@@ -244,7 +244,7 @@ function calculateAngleWithUncertainty(
   if (a.z !== undefined && b.z !== undefined && c.z !== undefined) {
     return calculate3DAngle(a, b, c);
   }
-  
+
   return calculate2DAngle(a, b, c);
 }
 
@@ -302,12 +302,6 @@ function calculate2DAngle(
 // CLINICAL-GRADE JOINT ANGLE CALCULATIONS
 // ============================================================================
 
-interface ClinicalJointAngle extends JointAngle {
-  confidence: number;
-  method: '3d' | '2d';
-  clinicalSignificance: 'normal' | 'limited' | 'excessive' | 'borderline';
-  deviationFromNorm: number;
-}
 
 const CLINICAL_NORMS: Record<string, { min: number; max: number }> = {
   shoulder_flexion: { min: 160, max: 180 },
@@ -325,7 +319,7 @@ export function calculateClinicalJointAngles(
   const angles: Record<string, ClinicalJointAngle> = {};
 
   // Helper to calculate with confidence
-  const calc = (a: PoseLandmark, b: PoseLandmark, c: PoseLandmark) => 
+  const calc = (a: PoseLandmark, b: PoseLandmark, c: PoseLandmark) =>
     calculateAngleWithUncertainty(a, b, c);
 
   // Shoulder Flexion (Left)
@@ -463,10 +457,10 @@ export function calculateClinicalJointAngles(
     const joint = angles[key];
     const oppositeKey = key.replace('left_', 'right_').replace('right_', 'left_');
     const opposite = angles[oppositeKey];
-    
+
     if (joint && opposite) {
       joint.bilateral_difference = Math.abs(
-        (joint.left_angle || joint.right_angle || 0) - 
+        (joint.left_angle || joint.right_angle || 0) -
         (opposite.left_angle || opposite.right_angle || 0)
       );
     }
@@ -484,15 +478,15 @@ function createClinicalAngle(
   method: '2d' | '3d'
 ): ClinicalJointAngle {
   const norm = CLINICAL_NORMS[normKey];
-  const deviationFromNorm = norm 
+  const deviationFromNorm = norm
     ? Math.min(
-        Math.abs(angle - norm.min),
-        Math.abs(angle - norm.max)
-      )
+      Math.abs(angle - norm.min),
+      Math.abs(angle - norm.max)
+    )
     : 0;
 
   let clinicalSignificance: 'normal' | 'limited' | 'excessive' | 'borderline';
-  
+
   if (!norm) {
     clinicalSignificance = 'normal';
   } else if (angle >= norm.min && angle <= norm.max) {
@@ -508,8 +502,8 @@ function createClinicalAngle(
     left_angle: angle,
     right_angle: angle,
     normal_range: normalRange,
-    status: clinicalSignificance === 'normal' ? 'normal' : 
-            clinicalSignificance === 'limited' ? 'limited' : 'excessive',
+    status: clinicalSignificance === 'normal' ? 'normal' :
+      clinicalSignificance === 'limited' ? 'limited' : 'excessive',
     confidence,
     method,
     deviationFromNorm,

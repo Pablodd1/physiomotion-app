@@ -1,8 +1,46 @@
 // TypeScript Type Definitions for Medical Movement Assessment Platform
 
+// Mock types for non-Cloudflare environments
+export type D1Database = {
+  prepare: (query: string) => D1PreparedStatement;
+  batch: (statements: D1PreparedStatement[]) => Promise<D1Result[]>;
+  exec: (query: string) => Promise<D1Result>;
+}
+
+export type D1PreparedStatement = {
+  bind: (...args: any[]) => D1PreparedStatement;
+  first: <T = any>(column?: string) => Promise<T | null>;
+  all: <T = any>() => Promise<D1Result<T>>;
+  run: () => Promise<D1Result>;
+}
+
+export type D1Result<T = any> = {
+  results: T[];
+  success: boolean;
+  meta: any;
+  error?: string;
+}
+
+export type R2Bucket = any;
+
 export type Bindings = {
   DB: D1Database;
   R2: R2Bucket;
+  JWT_SECRET?: string;
+  AUTH_SECRET?: string;
+  AUTH_DOMAIN?: string;
+}
+
+export type Variables = {
+  clinician: {
+    id: number;
+    email: string;
+    role: string;
+    clinic_id?: number;
+  };
+  clinicianId: number;
+  validatedData: any;
+  validatedId: number;
 }
 
 // ============================================================================
@@ -20,7 +58,7 @@ export interface Patient {
   phone?: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
-  
+
   // Address
   address_line1?: string;
   address_line2?: string;
@@ -28,23 +66,23 @@ export interface Patient {
   state?: string;
   zip_code?: string;
   country?: string;
-  
+
   // Medical Information
   height_cm?: number;
   weight_kg?: number;
   blood_type?: string;
-  
+
   // Insurance & Billing
   insurance_provider?: string;
   insurance_policy_number?: string;
   insurance_group_number?: string;
-  
+
   // System Fields
   patient_status?: 'active' | 'inactive' | 'discharged';
   referring_physician?: string;
   primary_diagnosis?: string;
   notes?: string;
-  
+
   created_at?: string;
   updated_at?: string;
 }
@@ -52,35 +90,35 @@ export interface Patient {
 export interface MedicalHistory {
   id?: number;
   patient_id: number;
-  
+
   // Pre/Post Surgery
   surgery_type?: 'pre_surgery' | 'post_surgery' | 'none' | 'athletic_performance';
   surgery_date?: string;
   surgery_description?: string;
-  
+
   // Medical Conditions (stored as JSON strings)
   conditions?: string; // JSON array
   medications?: string; // JSON array
   allergies?: string; // JSON array
-  
+
   // Pain Assessment
   current_pain_level?: number; // 0-10
   pain_location?: string; // JSON array
   pain_description?: string;
-  
+
   // Previous Treatments
   previous_pt_therapy?: string;
   previous_chiropractic?: string;
   previous_surgeries?: string;
-  
+
   // Lifestyle
   activity_level?: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
   occupation?: string;
   sports_activities?: string; // JSON array
-  
+
   // Goals
   treatment_goals?: string;
-  
+
   created_at?: string;
   updated_at?: string;
 }
@@ -93,31 +131,31 @@ export interface Assessment {
   id?: number;
   patient_id: number;
   clinician_id?: number;
-  
+
   // Assessment Type
   assessment_type: 'initial' | 'progress' | 'discharge' | 'athletic_performance';
   assessment_status?: 'in_progress' | 'completed' | 'cancelled';
-  
+
   // Session Info
   session_date?: string;
   duration_minutes?: number;
-  
+
   // Overall Scores
   overall_score?: number;
   mobility_score?: number;
   stability_score?: number;
   movement_pattern_score?: number;
-  
+
   // Clinical Notes (SOAP Format)
   subjective_findings?: string;
   objective_findings?: string;
   assessment_summary?: string;
   plan?: string;
-  
+
   // Camera Integration
   femto_mega_connected?: number; // boolean
   video_recorded?: number; // boolean
-  
+
   created_at?: string;
   updated_at?: string;
 }
@@ -125,61 +163,61 @@ export interface Assessment {
 export interface MovementTest {
   id?: number;
   assessment_id: number;
-  
+
   // Test Information
   test_name: string;
   test_category?: 'mobility' | 'stability' | 'strength' | 'balance' | 'functional';
   test_order: number;
-  
+
   // Test Status
   test_status?: 'pending' | 'in_progress' | 'completed' | 'skipped';
-  
+
   // Instructions
   instructions: string;
   demo_video_url?: string;
-  
+
   // Timing
   started_at?: string;
   completed_at?: string;
   duration_seconds?: number;
-  
+
   // Camera Data
   camera_recording_url?: string;
   skeleton_data?: string; // JSON
-  
+
   created_at?: string;
 }
 
 export interface MovementAnalysis {
   id?: number;
   test_id: number;
-  
+
   // Joint Angles
   joint_angles: string; // JSON
-  
+
   // Range of Motion
   rom_measurements?: string; // JSON
-  
+
   // Asymmetry Detection
   left_right_asymmetry?: string; // JSON
-  
+
   // Movement Quality Scores
   movement_quality_score?: number;
   stability_score?: number;
   compensation_detected?: number; // boolean
-  
+
   // Deficiencies
   deficiencies?: string; // JSON array
-  
+
   // AI Analysis
   ai_confidence_score?: number;
   ai_recommendations?: string; // JSON array
-  
+
   // Biomechanical Data
   velocity_data?: string; // JSON
   acceleration_data?: string; // JSON
   trajectory_data?: string; // JSON
-  
+
   analyzed_at?: string;
 }
 
@@ -189,36 +227,36 @@ export interface MovementAnalysis {
 
 export interface Exercise {
   id?: number;
-  
+
   // Exercise Info
   exercise_name: string;
   exercise_category: 'strength' | 'flexibility' | 'balance' | 'mobility' | 'stability' | 'cardio' | 'functional';
-  
+
   // Targets
   target_muscles?: string; // JSON array
   target_joints?: string; // JSON array
   target_movements?: string; // JSON array
-  
+
   // Difficulty
   difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-  
+
   // Instructions
   description: string;
   instructions: string;
   contraindications?: string;
-  
+
   // Media
   demo_video_url?: string;
   demo_image_url?: string;
-  
+
   // MediaPipe Pose Reference
   reference_keypoints?: string; // JSON
   acceptable_deviation?: number;
-  
+
   // Metadata
   equipment_required?: string; // JSON array
   estimated_duration_seconds?: number;
-  
+
   created_at?: string;
   updated_at?: string;
 }
@@ -228,28 +266,28 @@ export interface PrescribedExercise {
   patient_id: number;
   assessment_id?: number;
   exercise_id: number;
-  
+
   // Prescription Details
   sets: number;
   repetitions: number;
   hold_duration_seconds?: number;
   rest_between_sets_seconds?: number;
-  
+
   // Frequency
   times_per_week: number;
   total_weeks?: number;
-  
+
   // Status
   prescription_status?: 'active' | 'completed' | 'discontinued' | 'modified';
-  
+
   // Clinical Reasoning
   clinical_reason?: string;
   target_deficiency?: string;
-  
+
   // Progress Tracking
   compliance_percentage?: number;
   last_performed_at?: string;
-  
+
   prescribed_at?: string;
   prescribed_by?: number; // clinician_id
 }
@@ -262,32 +300,32 @@ export interface ExerciseSession {
   id?: number;
   patient_id: number;
   prescribed_exercise_id: number;
-  
+
   // Session Info
   session_date?: string;
   completed?: number; // boolean
-  
+
   // Performance Data
   sets_completed?: number;
   reps_completed?: number;
   duration_seconds?: number;
-  
+
   // Quality Assessment
   form_quality_score?: number; // 0-100
   pose_accuracy_data?: string; // JSON
-  
+
   // Errors Detected
   form_errors?: string; // JSON array
   compensation_patterns?: string; // JSON array
-  
+
   // Patient Feedback
   pain_level_during?: number; // 0-10
   difficulty_rating?: number; // 1-5
   patient_notes?: string;
-  
+
   // Media
   recording_url?: string;
-  
+
   analyzed_at?: string;
 }
 
@@ -295,20 +333,20 @@ export interface MonitoringAlert {
   id?: number;
   patient_id: number;
   exercise_session_id?: number;
-  
+
   // Alert Type
   alert_type: 'form_error' | 'pain_reported' | 'non_compliance' | 'progress_milestone' | 'concern';
   alert_severity: 'low' | 'medium' | 'high' | 'critical';
-  
+
   // Details
   alert_message: string;
   alert_details?: string; // JSON
-  
+
   // Status
   alert_status?: 'new' | 'reviewed' | 'resolved' | 'dismissed';
   reviewed_by?: number; // clinician_id
   reviewed_at?: string;
-  
+
   created_at?: string;
 }
 
@@ -321,15 +359,15 @@ export interface BillingCode {
   cpt_code: string;
   code_description: string;
   code_category: 'evaluation' | 'treatment' | 'rpm' | 'exercise' | 'monitoring';
-  
+
   // Requirements
   minimum_duration_minutes?: number;
   requires_documentation?: number; // boolean
-  
+
   // RPM Specific
   is_rpm_code?: number; // boolean
   rpm_time_requirement_minutes?: number;
-  
+
   created_at?: string;
 }
 
@@ -338,23 +376,23 @@ export interface BillableEvent {
   patient_id: number;
   assessment_id?: number;
   exercise_session_id?: number;
-  
+
   // Billing Info
   cpt_code_id: number;
   service_date: string;
   duration_minutes?: number;
-  
+
   // Documentation
   clinical_note?: string;
   medical_necessity?: string;
-  
+
   // Status
   billing_status?: 'pending' | 'submitted' | 'paid' | 'denied';
-  
+
   // Provider Info
   provider_id?: number; // clinician_id
   provider_npi?: string;
-  
+
   created_at?: string;
 }
 
@@ -364,23 +402,23 @@ export interface BillableEvent {
 
 export interface Clinician {
   id?: number;
-  
+
   // Personal Info
   first_name: string;
   last_name: string;
   email: string;
-  
+
   // Credentials
   credential?: string; // PT, DPT, DC, MD, etc.
   license_number?: string;
   npi_number?: string;
-  
+
   // Specialization
   specialty?: 'physical_therapy' | 'chiropractic' | 'sports_medicine' | 'orthopedics' | 'other';
-  
+
   // Account
   account_status?: 'active' | 'inactive' | 'suspended';
-  
+
   created_at?: string;
   updated_at?: string;
 }
@@ -443,6 +481,13 @@ export interface JointAngle {
   bilateral_difference?: number;
   normal_range: [number, number]; // [min, max]
   status: 'normal' | 'limited' | 'excessive';
+}
+
+export interface ClinicalJointAngle extends JointAngle {
+  confidence: number;
+  method: '3d' | '2d';
+  clinicalSignificance: 'normal' | 'limited' | 'excessive' | 'borderline';
+  deviationFromNorm: number;
 }
 
 export interface BiomechanicalAnalysis {

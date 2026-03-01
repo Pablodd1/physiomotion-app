@@ -1,9 +1,9 @@
 // Centralized error handling for API
-import type { Middleware } from 'hono/factory'
+import type { MiddlewareHandler } from 'hono'
 import { safeLog } from './hipaa'
 
 // Simple wrapper to catch errors in route handlers
-export const errorHandler: Middleware = (next) => async (c) => {
+export const errorHandler: MiddlewareHandler = async (c, next) => {
   try {
     return await next()
   } catch (err: any) {
