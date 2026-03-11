@@ -806,15 +806,17 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
 
 async function updateCompliancePercentage(db: any, prescribedExerciseId: number) {
   // Get total sessions completed vs expected
-  const result = (await db.prepare(`
+  const resultPromise = db.prepare(`
     SELECT COUNT(*) as completed_count
     FROM exercise_sessions
     WHERE prescribed_exercise_id = ? AND completed = 1
-  `).bind(prescribedExerciseId).first()) as any
+  `).bind(prescribedExerciseId).first()
   
-  const prescription = (await db.prepare(`
+  const prescriptionPromise = db.prepare(`
     SELECT times_per_week, prescribed_at FROM prescribed_exercises WHERE id = ?
-  `).bind(prescribedExerciseId).first()) as any
+  `).bind(prescribedExerciseId).first()
+
+  const [result, prescription] = await Promise.all([resultPromise, prescriptionPromise]) as any[]
   
   if (result && prescription && prescription.prescribed_at) {
     const prescribedDate = new Date(prescription.prescribed_at)
