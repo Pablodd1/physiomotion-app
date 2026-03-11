@@ -505,7 +505,12 @@ app.post('/api/exercise-sessions', async (c) => {
     ).run()
     
     // Update compliance tracking (non-blocking)
-    c.executionCtx.waitUntil(updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id))
+    const complianceUpdate = updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id)
+      .catch(err => console.error('Failed to update compliance:', err))
+
+    if (c.executionCtx) {
+      c.executionCtx.waitUntil(complianceUpdate)
+    }
     
     return c.json({ success: true, data: { id: result.meta.last_row_id } })
   } catch (error: any) {
@@ -689,7 +694,7 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     let aiInsights = ""
     if (tests.length > 0 && typeof tests[0].deficiencies === 'string') {
         try {
-            const defs = JSON.parse(tests[0].deficiencies)
+            const defs = JSON.parse(String(tests[0].deficiencies))
             if (defs.length > 0) {
                 const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
                 aiInsights = ragResult.answer
@@ -855,13 +860,13 @@ function generateMedicalNote(assessment: any, tests: any[]) {
   for (const test of tests) {
     if (test.deficiencies) {
       try {
-        const deficiencies = JSON.parse(test.deficiencies)
+        const deficiencies = JSON.parse(String(test.deficiencies))
         allDeficiencies.push(...deficiencies)
       } catch (e) {}
     }
     if (test.ai_recommendations) {
       try {
-        const recs = JSON.parse(test.ai_recommendations)
+        const recs = JSON.parse(String(test.ai_recommendations))
         allRecommendations.push(...recs)
       } catch (e) {}
     }
