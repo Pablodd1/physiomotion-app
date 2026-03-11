@@ -85,12 +85,20 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ success: false, error: 'Invalid email or password' }, 401)
     }
     
-    // Automatic migration to PBKDF2 if using legacy hash
-    if (!clinician.password_hash.includes(':')) {
-      const newHash = await hashPassword(password);
-      await c.env.DB.prepare(`
-        UPDATE clinicians SET password_hash = ? WHERE id = ?
-      `).bind(newHash, clinician.id).run();
+    // Upgrade legacy password hash if detected
+    if (clinician.password_hash.length === 64 && !clinician.password_hash.includes(':')) {
+       try {
+           const newHash = await hashPassword(password);
+           await c.env.DB.prepare(`
+             UPDATE clinicians SET password_hash = ? WHERE id = ?
+           `).bind(newHash, clinician.id).run();
+
+           // Update the local clinician object so we don't return old hash (though we remove it anyway)
+           clinician.password_hash = newHash;
+       } catch (e) {
+           console.error('Failed to upgrade password hash:', e);
+           // Continue login even if upgrade fails
+       }
     }
 
     // Update last login
@@ -707,7 +715,15 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     let aiInsights = ""
     if (tests.length > 0 && tests[0].deficiencies && typeof tests[0].deficiencies === 'string') {
         try {
-            const defs = JSON.parse(tests[0].deficiencies)
+            let defs: any[] = [];
+            const rawDefs = tests[0].deficiencies;
+
+            if (typeof rawDefs === 'string') {
+                defs = JSON.parse(rawDefs);
+            } else if (Array.isArray(rawDefs)) {
+                defs = rawDefs;
+            }
+
             if (defs.length > 0) {
                 const ragResult = await queryExerciseKnowledge(c.env.DB, String(defs[0].area))
                 aiInsights = ragResult.answer
@@ -748,78 +764,85 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-// Password hashing using PBKDF2 (HIPAA-compliant)
+// Production-ready password hashing using PBKDF2 (Cloudflare Workers compatible)
 async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const enc = new TextEncoder();
 
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
     false,
-    ['deriveBits', 'deriveKey']
+    ["deriveBits", "deriveKey"]
   );
 
-  const derivedKey = await crypto.subtle.deriveBits(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt: salt,
       iterations: 100000,
-      hash: 'SHA-256'
+      hash: "SHA-256"
     },
-    baseKey,
-    256
+    keyMaterial,
+    256 // 256 bits = 32 bytes
   );
 
-  const hashHex = Array.from(new Uint8Array(derivedKey))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
 
   return `${saltHex}:${hashHex}`;
 }
 
 async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  // Legacy SHA-256 check with migration support
-  if (!storedHash.includes(':')) {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(password + 'physiomotion-salt-2025')
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-    return hashHex === storedHash;
+  // Legacy support for simple SHA-256 hashes
+  if (storedHash.length === 64 && !storedHash.includes(':')) {
+      const legacyHash = await hashPasswordLegacy(password);
+      return legacyHash === storedHash;
   }
 
-  const [saltHex, hashHex] = storedHash.split(':');
+  const parts = storedHash.split(':');
+  if (parts.length !== 2) return false;
+
+  const [saltHex, hashHex] = parts;
+
   const match = saltHex.match(/.{1,2}/g);
   if (!match) return false;
 
   const salt = new Uint8Array(match.map(byte => parseInt(byte, 16)));
+  const enc = new TextEncoder();
 
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
     false,
-    ['deriveBits', 'deriveKey']
+    ["deriveBits", "deriveKey"]
   );
 
-  const derivedKey = await crypto.subtle.deriveBits(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt: salt,
       iterations: 100000,
-      hash: 'SHA-256'
+      hash: "SHA-256"
     },
-    baseKey,
+    keyMaterial,
     256
   );
 
-  const computedHashHex = Array.from(new Uint8Array(derivedKey))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-
+  const computedHashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
   return computedHashHex === hashHex;
+}
+
+// Legacy hashing function for backward compatibility
+async function hashPasswordLegacy(password: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password + 'physiomotion-salt-2025')
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  return hashHex
 }
 
 async function updateCompliancePercentage(db: any, prescribedExerciseId: number) {
