@@ -24,20 +24,21 @@ export async function queryExerciseKnowledge(db: any, query: string): Promise<RA
   }
 
   // Search exercises table for keywords
-  let matches: any[] = [];
+  let exercises: any[] = [];
   try {
-    // Construct dynamic query with parameterized LIKE clauses
-    // Use LOWER() for case-insensitive matching to match original behavior
-    const conditions = keywords.map(() => `(LOWER(name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(instructions) LIKE ?)`).join(' OR ');
-    const params = keywords.flatMap(k => [`%${k}%`, `%${k}%`, `%${k}%`]);
-
     const { results } = await db.prepare(`
-      SELECT * FROM exercises WHERE ${conditions} LIMIT 20
-    `).bind(...params).all();
-    matches = results;
+      SELECT name, description, instructions, targeted_deficiencies
+      FROM exercises
+    `).all();
+    exercises = results;
   } catch (e) {
     console.error('RAG Database error:', e);
   }
+
+  const matches = exercises.filter(ex => {
+    const text = `${ex.name} ${ex.description} ${ex.instructions} ${ex.targeted_deficiencies}`.toLowerCase();
+    return keywords.some(k => text.includes(k));
+  });
 
   if (matches.length === 0) {
     return {
@@ -49,7 +50,7 @@ export async function queryExerciseKnowledge(db: any, query: string): Promise<RA
 
   // Build answer based on matches
   const topMatch = matches[0];
-  const answer = `Based on our clinical protocols, for concerns related to "${query}", we recommend focusing on ${topMatch.name}. ${topMatch.description}. To perform this correctly: ${(topMatch.instructions || '').split('\n')[0]}.`;
+  const answer = `Based on our clinical protocols, for concerns related to "${query}", we recommend focusing on ${topMatch.name}. ${topMatch.description}. To perform this correctly: ${topMatch.instructions.split('\n')[0]}.`;
 
   return {
     answer,

@@ -21,7 +21,7 @@ const APP_STATE = {
 
 const API = {
   baseURL: '/api',
-  
+
   async request(endpoint, options = {}) {
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -31,44 +31,44 @@ const API = {
         },
         ...options
       });
-      
+
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.error || 'API request failed');
       }
-      
+
       return data;
     } catch (error) {
       console.error('API Error:', error);
       throw error;
     }
   },
-  
+
   // Patient endpoints
   patients: {
     create: (data) => API.request('/patients', { method: 'POST', body: JSON.stringify(data) }),
     list: () => API.request('/patients'),
     get: (id) => API.request(`/patients/${id}`),
-    addMedicalHistory: (id, data) => API.request(`/patients/${id}/medical-history`, { 
-      method: 'POST', 
-      body: JSON.stringify(data) 
+    addMedicalHistory: (id, data) => API.request(`/patients/${id}/medical-history`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     }),
     getAssessments: (id) => API.request(`/patients/${id}/assessments`),
     getPrescriptions: (id) => API.request(`/patients/${id}/prescriptions`),
     getSessions: (id) => API.request(`/patients/${id}/sessions`)
   },
-  
+
   // Assessment endpoints
   assessments: {
     create: (data) => API.request('/assessments', { method: 'POST', body: JSON.stringify(data) }),
-    addTest: (id, data) => API.request(`/assessments/${id}/tests`, { 
-      method: 'POST', 
-      body: JSON.stringify(data) 
+    addTest: (id, data) => API.request(`/assessments/${id}/tests`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     }),
     generateNote: (id) => API.request(`/assessments/${id}/generate-note`, { method: 'POST' })
   },
-  
+
   // Test endpoints
   tests: {
     analyze: (id, skeletonData) => API.request(`/tests/${id}/analyze`, {
@@ -77,13 +77,13 @@ const API = {
     }),
     getResults: (id) => API.request(`/tests/${id}/results`)
   },
-  
+
   // Exercise endpoints
   exercises: {
     list: (category) => API.request(`/exercises${category ? `?category=${category}` : ''}`),
     prescribe: (data) => API.request('/prescriptions', { method: 'POST', body: JSON.stringify(data) })
   },
-  
+
   // Session endpoints
   sessions: {
     record: (data) => API.request('/exercise-sessions', { method: 'POST', body: JSON.stringify(data) })
@@ -104,7 +104,7 @@ function showNotification(message, type = 'info') {
   }`;
   notification.textContent = message;
   document.body.appendChild(notification);
-  
+
   setTimeout(() => {
     notification.remove();
   }, 3000);
@@ -126,7 +126,7 @@ async function initMediaPipePose() {
   try {
     // Load MediaPipe Pose via CDN
     await loadMediaPipeScript();
-    
+
     const vision = await window.MediaPipeSolutions.Vision;
     const poseDetector = await vision.PoseLandmarker.createFromOptions({
       baseOptions: {
@@ -136,7 +136,7 @@ async function initMediaPipePose() {
       runningMode: 'VIDEO',
       numPoses: 1
     });
-    
+
     APP_STATE.poseDetector = poseDetector;
     return poseDetector;
   } catch (error) {
@@ -152,7 +152,7 @@ async function loadMediaPipeScript() {
       resolve();
       return;
     }
-    
+
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest';
     script.onload = resolve;
@@ -169,9 +169,9 @@ function convertMediaPipeToSkeletonData(results) {
   if (!results || !results.landmarks || results.landmarks.length === 0) {
     return null;
   }
-  
+
   const landmarks = results.landmarks[0];
-  
+
   // Map MediaPipe indices to our skeleton structure
   return {
     timestamp: Date.now(),
@@ -227,10 +227,10 @@ async function startCamera(videoElement, facingMode = 'user') {
       },
       audio: false
     });
-    
+
     videoElement.srcObject = stream;
     APP_STATE.mediaStream = stream;
-    
+
     return stream;
   } catch (error) {
     console.error('Camera access error:', error);
@@ -254,18 +254,18 @@ async function startPoseTracking(videoElement, canvasElement) {
   const ctx = canvasElement.getContext('2d');
   APP_STATE.skeletonData = [];
   APP_STATE.isRecording = true;
-  
+
   async function detectPose() {
     if (!APP_STATE.isRecording) return;
-    
+
     try {
       if (APP_STATE.poseDetector) {
         const results = await APP_STATE.poseDetector.detectForVideo(videoElement, Date.now());
-        
+
         if (results.landmarks && results.landmarks.length > 0) {
           // Draw skeleton
           drawSkeleton(ctx, results.landmarks[0], canvasElement.width, canvasElement.height);
-          
+
           // Store skeleton data
           const skeletonData = convertMediaPipeToSkeletonData(results);
           if (skeletonData) {
@@ -276,10 +276,10 @@ async function startPoseTracking(videoElement, canvasElement) {
     } catch (error) {
       console.error('Pose detection error:', error);
     }
-    
+
     requestAnimationFrame(detectPose);
   }
-  
+
   detectPose();
 }
 
@@ -289,7 +289,7 @@ function stopPoseTracking() {
 
 function drawSkeleton(ctx, landmarks, width, height) {
   ctx.clearRect(0, 0, width, height);
-  
+
   // Draw connections
   const connections = [
     [11, 12], // shoulders
@@ -300,14 +300,14 @@ function drawSkeleton(ctx, landmarks, width, height) {
     [23, 25], [25, 27], // left leg
     [24, 26], [26, 28], // right leg
   ];
-  
+
   ctx.strokeStyle = '#00ff00';
   ctx.lineWidth = 2;
-  
+
   connections.forEach(([start, end]) => {
     const startPoint = landmarks[start];
     const endPoint = landmarks[end];
-    
+
     if (startPoint.visibility > 0.5 && endPoint.visibility > 0.5) {
       ctx.beginPath();
       ctx.moveTo(startPoint.x * width, startPoint.y * height);
@@ -315,7 +315,7 @@ function drawSkeleton(ctx, landmarks, width, height) {
       ctx.stroke();
     }
   });
-  
+
   // Draw joints
   ctx.fillStyle = '#ff0000';
   landmarks.forEach(landmark => {
@@ -336,10 +336,10 @@ async function analyzeMovement(testId) {
     showNotification('No skeleton data captured', 'error');
     return null;
   }
-  
+
   // Take average of captured frames for analysis
   const avgSkeleton = averageSkeletonData(APP_STATE.skeletonData);
-  
+
   try {
     const result = await API.tests.analyze(testId, avgSkeleton);
     showNotification('Movement analysis complete!', 'success');
@@ -352,7 +352,7 @@ async function analyzeMovement(testId) {
 
 function averageSkeletonData(skeletonArray) {
   if (skeletonArray.length === 0) return null;
-  
+
   // Use the middle frame as representative
   const middleIndex = Math.floor(skeletonArray.length / 2);
   return skeletonArray[middleIndex];
@@ -366,7 +366,7 @@ function buildPatientIntakeForm() {
   return `
     <div class="max-w-4xl mx-auto p-6">
       <h2 class="text-3xl font-bold mb-6">New Patient Intake Form</h2>
-      
+
       <form id="patientIntakeForm" class="space-y-6">
         <!-- Personal Information -->
         <div class="bg-white p-6 rounded-lg shadow">
@@ -386,7 +386,7 @@ function buildPatientIntakeForm() {
             <input type="tel" name="phone" placeholder="Phone" class="border p-2 rounded">
           </div>
         </div>
-        
+
         <!-- Medical History -->
         <div class="bg-white p-6 rounded-lg shadow">
           <h3 class="text-xl font-semibold mb-4">Medical History</h3>
@@ -397,13 +397,13 @@ function buildPatientIntakeForm() {
               <option value="post_surgery">Post-Surgery</option>
               <option value="athletic_performance">Athletic Performance</option>
             </select>
-            
+
             <div>
               <label class="block mb-2">Current Pain Level (0-10)</label>
               <input type="range" name="current_pain_level" min="0" max="10" value="0" class="w-full">
               <span id="painLevelValue">0</span>
             </div>
-            
+
             <select name="activity_level" class="border p-2 rounded w-full">
               <option value="sedentary">Sedentary</option>
               <option value="light">Light Activity</option>
@@ -411,11 +411,11 @@ function buildPatientIntakeForm() {
               <option value="active">Active</option>
               <option value="very_active">Very Active</option>
             </select>
-            
+
             <textarea name="treatment_goals" placeholder="Treatment Goals" rows="3" class="border p-2 rounded w-full"></textarea>
           </div>
         </div>
-        
+
         <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg w-full hover:bg-blue-700">
           <i class="fas fa-save mr-2"></i>Create Patient
         </button>
@@ -430,7 +430,7 @@ function buildPatientIntakeForm() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('PhysioMotion App Initialized');
-  
+
   // Initialize MediaPipe
   try {
     await initMediaPipePose();
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     console.error('Failed to initialize MediaPipe:', error);
   }
-  
+
   // Update pain level display
   const painLevelInput = document.querySelector('input[name="current_pain_level"]');
   if (painLevelInput) {
@@ -448,10 +448,160 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ============================================================================
+// TRANSCRIPTION SERVICE
+// ============================================================================
+
+const TranscriptionService = {
+  recognition: null,
+  isTranscribing: false,
+  targetElement: null,
+
+  init: function() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return false;
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
+
+    this.recognition.onresult = (event) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + '. ';
+        }
+      }
+
+      if (finalTranscript && this.targetElement) {
+        this.targetElement.value += finalTranscript;
+        // Trigger input event for auto-resize or other listeners
+        this.targetElement.dispatchEvent(new Event('input'));
+      }
+    };
+
+    return true;
+  },
+
+  start: function(elementId) {
+    this.targetElement = document.getElementById(elementId);
+    if (!this.recognition && !this.init()) {
+      showNotification("Transcription not supported", "error");
+      return;
+    }
+
+    this.isTranscribing = true;
+    this.recognition.start();
+    showNotification("Transcription started", "success");
+  },
+
+  stop: function() {
+    this.isTranscribing = false;
+    if (this.recognition) {
+      this.recognition.stop();
+    }
+    showNotification("Transcription stopped", "info");
+  }
+};
+
+// ============================================================================
+// VOICE FEEDBACK & CONTROL
+// ============================================================================
+
+const VoiceFeedback = {
+  lastSpoken: 0,
+  speak: (text) => {
+    const now = Date.now();
+    if (now - VoiceFeedback.lastSpoken < 2500) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1;
+    window.speechSynthesis.speak(utterance);
+    VoiceFeedback.lastSpoken = now;
+  }
+};
+
+const VoiceControl = {
+  recognition: null,
+  isListening: false,
+
+  init: function() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return false;
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = false;
+    this.recognition.lang = 'en-US';
+
+    this.recognition.onresult = (event) => {
+      const text = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      console.log("🎤 Global Voice Command:", text);
+      this.handleCommand(text);
+    };
+
+    this.recognition.onend = () => {
+      if (this.isListening) {
+        try {
+          this.recognition.start();
+        } catch (e) {}
+      }
+    };
+
+    return true;
+  },
+
+  start: function() {
+    if (!this.recognition && !this.init()) return;
+    this.isListening = true;
+    try {
+      this.recognition.start();
+      showNotification("Voice Control Active", "success");
+    } catch (e) {}
+  },
+
+  stop: function() {
+    this.isListening = false;
+    if (this.recognition) {
+      this.recognition.stop();
+    }
+    showNotification("Voice Control Disabled", "info");
+  },
+
+  handleCommand: function(text) {
+    // Navigation Commands
+    if (text.includes("go to home") || text.includes("dashboard")) {
+      window.location.href = "/";
+    } else if (text.includes("go to intake") || text.includes("new patient")) {
+      window.location.href = "/intake";
+    } else if (text.includes("go to patients") || text.includes("patient list")) {
+      window.location.href = "/patients";
+    } else if (text.includes("start assessment")) {
+      window.location.href = "/assessment";
+    } else if (text.includes("telehealth") || text.includes("video call")) {
+      if (typeof window.startTelehealth === 'function') {
+        window.startTelehealth();
+      }
+    }
+
+    // Context-aware commands (if on assessment page)
+    if (window.location.pathname.includes("assessment")) {
+      if (typeof window.handleVoiceCommand === 'function') {
+        window.handleVoiceCommand(text);
+      }
+    }
+  }
+};
+
 // Export for use in other scripts
 window.PhysioMotion = {
   API,
   APP_STATE,
+  VoiceFeedback,
+  VoiceControl,
+  TranscriptionService,
   startCamera,
   stopCamera,
   startPoseTracking,

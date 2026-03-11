@@ -1,328 +1,42 @@
-import { validateEnv } from './env';
-import { db } from './db';
 import { Hono } from 'hono'
-import type { Context } from 'hono'
 import { cors } from 'hono/cors'
-import { serveStatic } from 'hono/cloudflare-pages'
-import { createMiddleware } from 'hono/factory'
-import type {
-  Bindings, Variables, Patient, Assessment, Exercise,
-  PrescribedExercise, ExerciseSession, SkeletonData
-} from './types'
+import { serveStatic } from 'hono/cloudflare-workers'
+import type { Bindings, Patient, Assessment, Exercise, PrescribedExercise, ExerciseSession, SkeletonData } from './types'
 import { performBiomechanicalAnalysis } from './utils/biomechanics'
 import { queryExerciseKnowledge } from './utils/rag'
-import { secureAuth, hashPassword, verifyPassword, generateToken, verifyToken } from './middleware/auth'
-import { validate, patientCreateSchema, assessmentCreateSchema, prescriptionSchema, clinicianRegisterSchema } from './middleware/validation'
-import { auditLog, phiAudit, securityHeaders, safeLog } from './middleware/hipaa'
-import { apiRateLimit, authRateLimit, writeRateLimit, analysisRateLimit } from './middleware/rateLimit'
-import { errorHandler } from './middleware/error'
-import { mockD1 } from './db'
 
-validateEnv();
+const app = new Hono<{ Bindings: Bindings }>()
 
-const app = new Hono<{ Bindings: Bindings, Variables: Variables }>()
-
-// Auth Middleware - Protects routes
-export const authMiddleware = createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401)
-  }
-
-  const token = authHeader.split(' ')[1]
-  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET
-  if (!secret) {
-    safeLog.error('JWT_SECRET or AUTH_SECRET not set')
-    return c.json({ success: false, error: 'Server configuration error' }, 500)
-  }
-
-  try {
-    const payload = await verifyToken(token, secret)
-    if (!payload) {
-      return c.json({ success: false, error: 'Invalid token' }, 401)
-    }
-    c.set('clinician', payload) // Store clinician payload in context
-    await next()
-  } catch (e) {
-    safeLog.warn('Token verification failed', e as Error)
-    return c.json({ success: false, error: 'Invalid or expired token' }, 401)
-  }
-})
-
-// ============================================================================
-// SECURITY MIDDLEWARE
-// ============================================================================
-
-// Security headers for all responses
-app.use('*', securityHeaders)
-
-// Global error handler
-// Removed invalid require
-
-// Global error handler
-if (typeof app.onError === 'function') {
-  app.onError((err: Error, c: Context<{ Bindings: Bindings, Variables: Variables }>) => {
-    safeLog.error('Unhandled server error', err, {
-      path: c.req.path,
-      method: c.req.method
-    })
-    return c.json({ success: false, error: 'Internal server error' }, 500)
-  })
-}
-
-// Not-found handler
-if (typeof (app as any).notFound === 'function') {
-  app.notFound((c: Context<{ Bindings: Bindings, Variables: Variables }>) => {
-    return c.json({ success: false, error: 'Endpoint not found', code: 'NOT_FOUND' }, 404)
-  })
-}
-
-// Production CORS configuration
-const corsConfig = {
-  origin: (origin: string) => {
-    const allowedOrigins = [
-      'https://physiomotion.com',
-      'https://www.physiomotion.com',
-      'https://app.physiomotion.com'
-    ]
-    // Allow no-origin requests (mobile apps, Postman, server-to-server)
-    if (!origin) return allowedOrigins[0]
-    if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost')) {
-      return origin
-    }
-    return allowedOrigins[0]
-  },
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true,
-  maxAge: 86400
-}
-
-app.use('/api/*', cors(corsConfig))
-app.use(errorHandler)
-
-// Health checks
-app.get('/api/healthz', async (c: Context<{ Bindings: Bindings, Variables: Variables }>) => {
-  let dbAlive = true
-  try {
-    if (mockD1) {
-      await mockD1.prepare('SELECT 1').first()
-    }
-  } catch (e) {
-    dbAlive = false
-  }
-  return c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    db: dbAlive ? 'connected' : 'unavailable',
-    environment: process.env.NODE_ENV || 'production',
-    version: '1.0.0'
-  })
-})
-
-app.get('/api/ready', async (c: Context<{ Bindings: Bindings, Variables: Variables }>) => {
-  // Lightweight readiness: DB + basic services
-  let ready = true
-  try {
-    if (mockD1) {
-      await mockD1.prepare('SELECT 1').first()
-    }
-  } catch {
-    ready = false
-  }
-  return c.json({ ready })
-})
-
-// Token refresh endpoint (very small flow)
-app.post('/api/auth/refresh', async (c: Context<{ Bindings: Bindings, Variables: Variables }>) => {
-  try {
-    const cookieHeader = c.req.header('Cookie') || ''
-    const match = cookieHeader.match(/refresh_token=([^;]+)/)
-    const refreshToken = match ? match[1] : null
-    const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET
-    if (!refreshToken || !secret) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401)
-    }
-    const payload = await verifyToken(refreshToken, secret)
-    if (!payload) {
-      return c.json({ success: false, error: 'Invalid token' }, 401)
-    }
-    const newToken = await generateToken({ id: payload.id, email: payload.email, role: payload.role }, secret)
-    // Return new token in body; optionally set as cookie
-    return c.json({ success: true, token: newToken })
-  } catch (e) {
-    safeLog.error('Refresh token failed', e as Error)
-    return c.json({ success: false, error: 'Unauthorized' }, 401)
-  }
-})
+// Enable CORS for API routes
+app.use('/api/*', cors())
 
 // Serve static files
-app.use('/static/*', serveStatic())
+app.use('/static/*', serveStatic({ root: './public', manifest: {} }))
 
 // ============================================================================
-// CACHING
-// ============================================================================
-let exercisesCache: any[] | null = null
-let lastExerciseCacheTime = 0
-const EXERCISE_CACHE_TTL = 3600 * 1000 // 1 hour
-
-let billingCodesCache: any[] | null = null
-let lastBillingCacheTime = 0
-const BILLING_CACHE_TTL = 3600 * 1000 // 1 hour
-
-// ============================================================================
-// AUTHENTICATION API
+// PATIENT MANAGEMENT API
 // ============================================================================
 
-// Register new clinician (rate limited)
-app.post('/api/auth/register', authRateLimit, validate(clinicianRegisterSchema), async (c) => {
+// Create new patient
+app.post('/api/patients', async (c) => {
   try {
-    const data = c.get('validatedData') as typeof clinicianRegisterSchema._type
+    const patient = await c.req.json<Patient>()
 
-    // Check if email already exists
-    const existing = await mockD1.prepare(`
-      SELECT id FROM clinicians WHERE email = ?
-  `).bind(data.email).first()
-
-    if (existing) {
-      return c.json({ success: false, error: 'Email already registered' }, 400)
-    }
-    
-    // Hash password using production-grade PBKDF2
-    const passwordHash = await hashPassword(data.password)
-    
     const result = await c.env.DB.prepare(`
-      INSERT INTO clinicians (
-        email, password_hash, first_name, last_name, title,
-        license_number, license_state, npi_number, phone, clinic_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      data.email, passwordHash, salt, data.first_name, data.last_name, data.title,
-      data.license_number, data.license_state, data.npi_number,
-      data.phone, data.clinic_name
-    ).run()
-
-    safeLog.info('New clinician registered', { clinicianId: result.meta.last_row_id, email: data.email })
-
-    return c.json({
-      success: true,
-      data: { id: result.meta.last_row_id }
-    })
-  } catch (error: any) {
-    safeLog.error('Registration failed', error as Error)
-    return c.json({ success: false, error: error.message }, 500)
-  }
-})
-
-// Login (rate limited)
-app.post('/api/auth/login', authRateLimit, async (c) => {
-  try {
-    const { email, password } = await c.req.json()
-
-    const clinician = await mockD1.prepare(`
-SELECT * FROM clinicians WHERE email = ? AND active = true
-  `).bind(email).first() as any
-
-    if (!clinician) {
-      safeLog.warn('Login failed - user not found', { email })
-      return c.json({ success: false, error: 'Invalid email or password' }, 401)
-    }
-
-    // Verify password with stored salt
-    const salt = clinician.salt || 'default-salt'
-    const isValid = await verifyPassword(password, salt, clinician.password_hash)
-
-    if (!isValid) {
-      safeLog.warn('Login failed - invalid password', { clinicianId: clinician.id, email })
-      return c.json({ success: false, error: 'Invalid email or password' }, 401)
-    }
-
-    // Generate JWT token
-    const token = await generateToken(
-      { id: clinician.id, email: clinician.email, role: clinician.role },
-      process.env.JWT_SECRET || process.env.AUTH_SECRET || 'default-secret-change-me'
-    )
-
-    // Update last login and activity
-    await mockD1.prepare(`
-      UPDATE clinicians SET last_login = CURRENT_TIMESTAMP, last_activity = CURRENT_TIMESTAMP WHERE id = ?
-  `).bind(clinician.id).run()
-
-    safeLog.info('Login successful', { clinicianId: clinician.id, email })
-
-    // Return user data (excluding password) and token
-    const { password_hash, salt: _, ...userData } = clinician
-
-    return c.json({
-      success: true,
-      data: {
-        ...userData,
-        token
-      }
-    })
-  } catch (error: any) {
-    safeLog.error('Login error', error as Error)
-    return c.json({ success: false, error: error.message }, 500)
-  }
-})
-
-// Get current clinician profile
-app.get('/api/auth/profile/:id', authMiddleware, async (c) => {
-  try {
-    const id = c.req.param('id')
-    const clinicianPayload = c.get('clinician')
-
-    if (clinicianPayload.id !== parseInt(id)) {
-      return c.json({ success: false, error: 'Unauthorized access to profile' }, 403)
-    }
-
-    const clinician = await mockD1.prepare(`
-      SELECT id, email, first_name, last_name, title, license_number,
-  license_state, npi_number, phone, clinic_name, role, active,
-  created_at, last_login
-      FROM clinicians WHERE id = ?
-  `).bind(id).first()
-
-    if (!clinician) {
-      return c.json({ success: false, error: 'Clinician not found' }, 404)
-    }
-
-    return c.json({ success: true, data: clinician })
-  } catch (error: any) {
-    return c.json({ success: false, error: error.message }, 500)
-  }
-})
-
-// ============================================================================
-// PATIENT MANAGEMENT API (Secured with Auth, Validation, Audit)
-// ============================================================================
-
-// Create new patient (requires auth, validated, audited)
-app.post('/api/patients',
-  authMiddleware,
-  validate(patientCreateSchema),
-  writeRateLimit,
-  auditLog('PATIENT_CREATE', 'patient'),
-  async (c) => {
-    try {
-      const validatedData = c.get('validatedData') as typeof patientCreateSchema._type
-      const clinician = c.get('clinician')
-
-      const result = await mockD1.prepare(`
-        INSERT INTO patients(
-    first_name, last_name, date_of_birth, gender, email, phone,
-    emergency_contact_name, emergency_contact_phone,
-    address_line1, city, state, zip_code,
-    height_cm, weight_kg, insurance_provider, created_by_clinician_id
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO patients (
+        first_name, last_name, date_of_birth, gender, email, phone,
+        emergency_contact_name, emergency_contact_phone,
+        address_line1, city, state, zip_code,
+        height_cm, weight_kg, insurance_provider
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       patient.first_name, patient.last_name, patient.date_of_birth,
       patient.gender, patient.email, patient.phone,
-      patient.emergency_contact_name || null, patient.emergency_contact_phone || null,
-      patient.address_line1 || null, patient.city || null, patient.state || null, patient.zip_code || null,
-      patient.height_cm || null, patient.weight_kg || null, patient.insurance_provider || null
+      patient.emergency_contact_name, patient.emergency_contact_phone,
+      patient.address_line1, patient.city, patient.state, patient.zip_code,
+      patient.height_cm, patient.weight_kg, patient.insurance_provider
     ).run()
-    
+
     return c.json({
       success: true,
       data: { id: result.meta.last_row_id, ...patient }
@@ -332,86 +46,51 @@ app.post('/api/patients',
   }
 })
 
-      safeLog.info('Patient created', { patientId: result.meta.last_row_id, createdBy: clinician.id })
+// Get all patients
+app.get('/api/patients', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT * FROM patients ORDER BY created_at DESC
+    `).all()
 
-      return c.json({
-        success: true,
-        data: { id: result.meta.last_row_id, ...validatedData }
-      })
-    } catch (error: any) {
-      safeLog.error('Patient creation failed', error as Error)
-      return c.json({ success: false, error: error.message }, 500)
-    }
+    return c.json({ success: true, data: results })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
   }
-)
+})
 
-// Get all patients (requires auth, audited)
-app.get('/api/patients',
-  authMiddleware,
-  apiRateLimit,
-  auditLog('PATIENT_VIEW', 'patient'),
-  async (c) => {
-    try {
-      const clinician = c.get('clinician')
-      const { results } = await mockD1.prepare(`
-        SELECT id, first_name, last_name, date_of_birth, gender, email, phone,
-  city, state, created_at, patient_status
-        FROM patients WHERE created_by_clinician_id = ? ORDER BY created_at DESC
-  `).bind(clinician.id).all()
+// Get patient by ID
+app.get('/api/patients/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const patient = await c.env.DB.prepare(`
+      SELECT * FROM patients WHERE id = ?
+    `).bind(id).first()
 
-      return c.json({ success: true, data: results })
-    } catch (error: any) {
-      return c.json({ success: false, error: error.message }, 500)
+    if (!patient) {
+      return c.json({ success: false, error: 'Patient not found' }, 404)
     }
+
+    return c.json({ success: true, data: patient })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
   }
-)
-
-// Get patient by ID (requires auth, PHI audit)
-app.get('/api/patients/:id',
-  authMiddleware,
-  apiRateLimit,
-  phiAudit('VIEW', 'patient'),
-  async (c) => {
-    try {
-      const id = c.req.param('id')
-      const clinician = c.get('clinician')
-      const patient = await mockD1.prepare(`
-SELECT * FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(id, clinician.id).first()
-
-      if (!patient) {
-        return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-      }
-
-      return c.json({ success: true, data: patient })
-    } catch (error: any) {
-      return c.json({ success: false, error: error.message }, 500)
-    }
-  })
+})
 
 // ============================================================================
 // MEDICAL HISTORY API
 // ============================================================================
 
-app.post('/api/patients/:id/medical-history', authMiddleware, async (c) => {
+app.post('/api/patients/:id/medical-history', async (c) => {
   try {
     const patientId = c.req.param('id')
     const history = await c.req.json()
-    const clinician = c.get('clinician')
 
-    // Verify patient belongs to clinician
-    const patientCheck = await mockD1.prepare(`
-      SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(patientId, clinician.id).first()
-    if (!patientCheck) {
-      return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO medical_history(
-    patient_id, surgery_type, surgery_date, conditions, medications, allergies,
-    current_pain_level, pain_location, activity_level, treatment_goals
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO medical_history (
+        patient_id, surgery_type, surgery_date, conditions, medications, allergies,
+        current_pain_level, pain_location, activity_level, treatment_goals
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       patientId, history.surgery_type, history.surgery_date,
       JSON.stringify(history.conditions), JSON.stringify(history.medications),
@@ -430,25 +109,16 @@ app.post('/api/patients/:id/medical-history', authMiddleware, async (c) => {
 // ============================================================================
 
 // Create new assessment
-app.post('/api/assessments', authMiddleware, validate(assessmentCreateSchema), async (c) => {
+app.post('/api/assessments', async (c) => {
   try {
-    const assessment = c.get('validatedData') as typeof assessmentCreateSchema._type
-    const clinician = c.get('clinician')
+    const assessment = await c.req.json<Assessment>()
 
-    // Verify patient belongs to clinician
-    const patientCheck = await mockD1.prepare(`
-      SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(assessment.patient_id, clinician.id).first()
-    if (!patientCheck) {
-      return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO assessments(
-    patient_id, clinician_id, assessment_type, status
-  ) VALUES(?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO assessments (
+        patient_id, clinician_id, assessment_type, status
+      ) VALUES (?, ?, ?, ?)
     `).bind(
-      assessment.patient_id, clinician.id,
+      assessment.patient_id, assessment.clinician_id || 1,
       assessment.assessment_type, 'in_progress'
     ).run()
 
@@ -459,22 +129,12 @@ app.post('/api/assessments', authMiddleware, validate(assessmentCreateSchema), a
 })
 
 // Get assessments for patient
-app.get('/api/patients/:id/assessments', authMiddleware, async (c) => {
+app.get('/api/patients/:id/assessments', async (c) => {
   try {
     const patientId = c.req.param('id')
-    const clinician = c.get('clinician')
-
-    // Verify patient belongs to clinician
-    const patientCheck = await mockD1.prepare(`
-      SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(patientId, clinician.id).first()
-    if (!patientCheck) {
-      return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-    }
-
-    const { results } = await mockD1.prepare(`
-      SELECT * FROM assessments WHERE patient_id = ? AND clinician_id = ? ORDER BY assessment_date DESC
-  `).bind(patientId, clinician.id).all()
+    const { results } = await c.env.DB.prepare(`
+      SELECT * FROM assessments WHERE patient_id = ? ORDER BY assessment_date DESC
+    `).bind(patientId).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -483,16 +143,14 @@ app.get('/api/patients/:id/assessments', authMiddleware, async (c) => {
 })
 
 // Get all assessments
-app.get('/api/assessments', authMiddleware, async (c) => {
+app.get('/api/assessments', async (c) => {
   try {
-    const clinician = c.get('clinician')
-    const { results } = await mockD1.prepare(`
+    const { results } = await c.env.DB.prepare(`
       SELECT a.*, p.first_name, p.last_name
       FROM assessments a
       JOIN patients p ON a.patient_id = p.id
-      WHERE a.clinician_id = ? AND p.created_by_clinician_id = ?
-  ORDER BY a.assessment_date DESC
-    `).bind(clinician.id, clinician.id).all()
+      ORDER BY a.assessment_date DESC
+    `).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -501,19 +159,18 @@ app.get('/api/assessments', authMiddleware, async (c) => {
 })
 
 // Get assessment by ID
-app.get('/api/assessments/:id', authMiddleware, async (c) => {
+app.get('/api/assessments/:id', async (c) => {
   try {
     const id = c.req.param('id')
-    const clinician = c.get('clinician')
-    const assessment = await mockD1.prepare(`
+    const assessment = await c.env.DB.prepare(`
       SELECT a.*, p.first_name, p.last_name, p.date_of_birth
       FROM assessments a
       JOIN patients p ON a.patient_id = p.id
-      WHERE a.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(id, clinician.id, clinician.id).first()
+      WHERE a.id = ?
+    `).bind(id).first()
 
     if (!assessment) {
-      return c.json({ success: false, error: 'Assessment not found or unauthorized' }, 404)
+      return c.json({ success: false, error: 'Assessment not found' }, 404)
     }
 
     return c.json({ success: true, data: assessment })
@@ -527,25 +184,15 @@ app.get('/api/assessments/:id', authMiddleware, async (c) => {
 // ============================================================================
 
 // Create movement test
-app.post('/api/assessments/:id/tests', authMiddleware, async (c) => {
+app.post('/api/assessments/:id/tests', async (c) => {
   try {
     const assessmentId = c.req.param('id')
     const test = await c.req.json()
-    const clinician = c.get('clinician')
 
-    // Verify assessment belongs to clinician
-    const assessmentCheck = await mockD1.prepare(`
-      SELECT a.id FROM assessments a JOIN patients p ON a.patient_id = p.id
-      WHERE a.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(assessmentId, clinician.id, clinician.id).first()
-    if (!assessmentCheck) {
-      return c.json({ success: false, error: 'Assessment not found or unauthorized' }, 404)
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO movement_tests(
-    assessment_id, test_name, test_category, test_order, instructions, status
-  ) VALUES(?, ?, ?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO movement_tests (
+        assessment_id, test_name, test_category, test_order, instructions, status
+      ) VALUES (?, ?, ?, ?, ?, ?)
     `).bind(
       assessmentId, test.test_name, test.test_category,
       test.test_order, test.instructions, 'pending'
@@ -558,36 +205,25 @@ app.post('/api/assessments/:id/tests', authMiddleware, async (c) => {
 })
 
 // Update test with skeleton data and perform biomechanical analysis
-app.post('/api/tests/:id/analyze', authMiddleware, analysisRateLimit, async (c) => {
+app.post('/api/tests/:id/analyze', async (c) => {
   try {
     const testId = c.req.param('id')
     const { skeleton_data } = await c.req.json<{ skeleton_data: SkeletonData }>()
-    const clinician = c.get('clinician')
-
-    // Verify test belongs to clinician
-    const testCheck = await mockD1.prepare(`
-      SELECT mt.id FROM movement_tests mt JOIN assessments a ON mt.assessment_id = a.id
-      JOIN patients p ON a.patient_id = p.id
-      WHERE mt.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(testId, clinician.id, clinician.id).first()
-    if (!testCheck) {
-      return c.json({ success: false, error: 'Test not found or unauthorized' }, 404)
-    }
 
     // Perform biomechanical analysis
     const analysis = performBiomechanicalAnalysis(skeleton_data)
 
     // Update movement test with skeleton data and analysis results
-    await mockD1.prepare(`
+    await c.env.DB.prepare(`
       UPDATE movement_tests
       SET skeleton_data = ?,
-  movement_quality_score = ?,
-  deficiencies = ?,
-  compensations_detected = ?,
-  status = 'completed',
-  completed_at = CURRENT_TIMESTAMP
+          movement_quality_score = ?,
+          deficiencies = ?,
+          compensations_detected = ?,
+          status = 'completed',
+          completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
-  `).bind(
+    `).bind(
       JSON.stringify(skeleton_data),
       analysis.movement_quality_score,
       JSON.stringify(analysis.deficiencies),
@@ -610,20 +246,16 @@ app.post('/api/tests/:id/analyze', authMiddleware, analysisRateLimit, async (c) 
 })
 
 // Get test results
-app.get('/api/tests/:id/results', authMiddleware, async (c) => {
+app.get('/api/tests/:id/results', async (c) => {
   try {
     const testId = c.req.param('id')
-    const clinician = c.get('clinician')
 
-    // Verify test belongs to clinician
-    const test = await mockD1.prepare(`
-      SELECT mt.* FROM movement_tests mt JOIN assessments a ON mt.assessment_id = a.id
-      JOIN patients p ON a.patient_id = p.id
-      WHERE mt.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(testId, clinician.id, clinician.id).first()
+    const test = await c.env.DB.prepare(`
+      SELECT * FROM movement_tests WHERE id = ?
+    `).bind(testId).first()
 
     if (!test) {
-      return c.json({ success: false, error: 'Test not found or unauthorized' }, 404)
+      return c.json({ success: false, error: 'Test not found' }, 404)
     }
 
     return c.json({ success: true, data: test })
@@ -633,23 +265,12 @@ app.get('/api/tests/:id/results', authMiddleware, async (c) => {
 })
 
 // Get movement tests for assessment
-app.get('/api/assessments/:id/tests', authMiddleware, async (c) => {
+app.get('/api/assessments/:id/tests', async (c) => {
   try {
     const assessmentId = c.req.param('id')
-    const clinician = c.get('clinician')
-
-    // Verify assessment belongs to clinician
-    const assessmentCheck = await mockD1.prepare(`
-      SELECT a.id FROM assessments a JOIN patients p ON a.patient_id = p.id
-      WHERE a.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(assessmentId, clinician.id, clinician.id).first()
-    if (!assessmentCheck) {
-      return c.json({ success: false, error: 'Assessment not found or unauthorized' }, 404)
-    }
-
-    const { results } = await mockD1.prepare(`
+    const { results } = await c.env.DB.prepare(`
       SELECT * FROM movement_tests WHERE assessment_id = ? ORDER BY test_order
-  `).bind(assessmentId).all()
+    `).bind(assessmentId).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -661,16 +282,10 @@ app.get('/api/assessments/:id/tests', authMiddleware, async (c) => {
 // EXERCISE LIBRARY API
 // ============================================================================
 
-// Get all exercises (with caching)
-app.get('/api/exercises', authMiddleware, async (c) => {
+// Get all exercises
+app.get('/api/exercises', async (c) => {
   try {
     const category = c.req.query('category')
-
-    // Use cache if available and no category filter
-    const now = Date.now()
-    if (!category && exercisesCache && (now - lastExerciseCacheTime < EXERCISE_CACHE_TTL)) {
-      return c.json({ success: true, data: exercisesCache })
-    }
 
     let query = 'SELECT * FROM exercises'
     const params: any[] = []
@@ -682,13 +297,7 @@ app.get('/api/exercises', authMiddleware, async (c) => {
 
     query += ' ORDER BY name'
 
-    const { results } = await mockD1.prepare(query).bind(...params).all()
-
-    // Update cache if no filter
-    if (!category) {
-      exercisesCache = results
-      lastExerciseCacheTime = now
-    }
+    const { results } = await c.env.DB.prepare(query).bind(...params).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -701,30 +310,20 @@ app.get('/api/exercises', authMiddleware, async (c) => {
 // ============================================================================
 
 // Prescribe exercises
-app.post('/api/prescriptions', authMiddleware, validate(prescriptionSchema), async (c) => {
+app.post('/api/prescriptions', async (c) => {
   try {
-    const prescription = c.get('validatedData') as typeof prescriptionSchema._type
-    const clinician = c.get('clinician')
+    const prescription = await c.req.json<PrescribedExercise>()
 
-    // Verify patient and assessment belong to clinician
-    const patientAssessmentCheck = await mockD1.prepare(`
-      SELECT a.id FROM assessments a JOIN patients p ON a.patient_id = p.id
-      WHERE a.id = ? AND a.patient_id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(prescription.assessment_id, prescription.patient_id, clinician.id, clinician.id).first()
-    if (!patientAssessmentCheck) {
-      return c.json({ success: false, error: 'Patient or Assessment not found or unauthorized' }, 404)
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO prescribed_exercises(
-    patient_id, assessment_id, exercise_id, sets, repetitions,
-    times_per_week, clinical_reason, target_deficiency, prescribed_by
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO prescribed_exercises (
+        patient_id, assessment_id, exercise_id, sets, repetitions,
+        times_per_week, clinical_reason, target_deficiency, prescribed_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       prescription.patient_id, prescription.assessment_id,
       prescription.exercise_id, prescription.sets, prescription.repetitions,
       prescription.times_per_week, prescription.clinical_reason,
-      prescription.target_deficiency, clinician.id
+      prescription.target_deficiency, prescription.prescribed_by || 1
     ).run()
 
     return c.json({ success: true, data: { id: result.meta.last_row_id } })
@@ -734,32 +333,23 @@ app.post('/api/prescriptions', authMiddleware, validate(prescriptionSchema), asy
 })
 
 // Get patient's prescribed exercises
-app.get('/api/patients/:id/prescriptions', authMiddleware, async (c) => {
+app.get('/api/patients/:id/prescriptions', async (c) => {
   try {
     const patientId = c.req.param('id')
-    const clinician = c.get('clinician')
 
-    // Verify patient belongs to clinician
-    const patientCheck = await mockD1.prepare(`
-      SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(patientId, clinician.id).first()
-    if (!patientCheck) {
-      return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-    }
-
-    const { results } = await mockD1.prepare(`
+    const { results } = await c.env.DB.prepare(`
       SELECT
-pe.*,
-  e.name as exercise_name,
-  e.description,
-  e.instructions,
-  e.demo_video_url,
-  e.difficulty
+        pe.*,
+        e.name as exercise_name,
+        e.description,
+        e.instructions,
+        e.demo_video_url,
+        e.difficulty
       FROM prescribed_exercises pe
       JOIN exercises e ON pe.exercise_id = e.id
       WHERE pe.patient_id = ? AND pe.status = 'active'
       ORDER BY pe.created_at DESC
-  `).bind(patientId).all()
+    `).bind(patientId).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -771,41 +361,26 @@ pe.*,
 // EXERCISE SESSION API (Remote Patient Monitoring)
 // ============================================================================
 
-// Record export const sessionActivity = createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
-app.post('/api/exercise-sessions', authMiddleware, async (c) => {
+// Record exercise session
+app.post('/api/exercise-sessions', async (c) => {
   try {
     const session = await c.req.json<ExerciseSession>()
-    const clinician = c.get('clinician')
 
-    // Verify prescribed exercise belongs to clinician's patient
-    const prescribedExerciseCheck = await mockD1.prepare(`
-      SELECT pe.id FROM prescribed_exercises pe JOIN patients p ON pe.patient_id = p.id
-      WHERE pe.id = ? AND pe.patient_id = ? AND p.created_by_clinician_id = ?
-  `).bind(session.prescribed_exercise_id, session.patient_id, clinician.id).first()
-    if (!prescribedExerciseCheck) {
-      return c.json({ success: false, error: 'Prescribed exercise not found or unauthorized' }, 404)
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO exercise_sessions(
-    patient_id, prescribed_exercise_id, sets_completed, reps_completed,
-    duration_seconds, form_quality_score, pose_accuracy_data,
-    pain_level_during, difficulty_rating, completed
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO exercise_sessions (
+        patient_id, prescribed_exercise_id, sets_completed, reps_completed,
+        duration_seconds, form_quality_score, pose_accuracy_data,
+        pain_level_during, difficulty_rating, completed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       session.patient_id, session.prescribed_exercise_id,
       session.sets_completed, session.reps_completed, session.duration_seconds,
-      session.form_quality_score, JSON.stringify(session.pose_accuracy_data), // Ensure JSON stringify
+      session.form_quality_score, session.pose_accuracy_data,
       session.pain_level_during, session.difficulty_rating, session.completed
     ).run()
 
     // Update compliance tracking
-    if (c.executionCtx) {
-      c.executionCtx.waitUntil(updateCompliancePercentage(mockD1, session.prescribed_exercise_id))
-    } else {
-      // Fallback for environments without executionCtx
-      updateCompliancePercentage(mockD1, session.prescribed_exercise_id).catch(console.error)
-    }
+    await updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id)
 
     return c.json({ success: true, data: { id: result.meta.last_row_id } })
   } catch (error: any) {
@@ -814,34 +389,83 @@ app.post('/api/exercise-sessions', authMiddleware, async (c) => {
 })
 
 // Get patient exercise history
-app.get('/api/patients/:id/sessions', authMiddleware, async (c) => {
+app.get('/api/patients/:id/sessions', async (c) => {
   try {
     const patientId = c.req.param('id')
-    const clinician = c.get('clinician')
 
-    // Verify patient belongs to clinician
-    const patientCheck = await mockD1.prepare(`
-      SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(patientId, clinician.id).first()
-    if (!patientCheck) {
-      return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-    }
-
-    const { results } = await mockD1.prepare(`
+    const { results } = await c.env.DB.prepare(`
       SELECT
-es.*,
-  e.name as exercise_name,
-  pe.sets as prescribed_sets,
-  pe.repetitions as prescribed_reps
+        es.*,
+        e.name as exercise_name,
+        pe.sets as prescribed_sets,
+        pe.reps as prescribed_reps
       FROM exercise_sessions es
-      JOIN prescribed_exercises pe ON es.prescribed_exercise_id = pe.id
+      JOIN prescribed_exercises pe ON es.prescription_id = pe.prescription_id
       JOIN exercises e ON pe.exercise_id = e.id
       WHERE es.patient_id = ?
-  ORDER BY es.session_date DESC
+      ORDER BY es.session_date DESC
       LIMIT 50
-  `).bind(patientId).all()
+    `).bind(patientId).all()
 
     return c.json({ success: true, data: results })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ============================================================================
+// ANALYTICS API
+// ============================================================================
+
+app.get('/api/patients/:id/analytics', async (c) => {
+  try {
+    const patientId = c.req.param('id')
+
+    // Get historical movement quality scores
+    const { results: movementScores } = await c.env.DB.prepare(`
+      SELECT
+        a.assessment_date,
+        mt.test_name,
+        mt.movement_quality_score
+      FROM assessments a
+      JOIN movement_tests mt ON a.id = mt.assessment_id
+      WHERE a.patient_id = ? AND mt.status = 'completed'
+      ORDER BY a.assessment_date ASC
+    `).bind(patientId).all()
+
+    // Get exercise compliance
+    const { results: compliance } = await c.env.DB.prepare(`
+      SELECT
+        e.name as exercise_name,
+        pe.compliance_percentage,
+        pe.last_performed_at
+      FROM prescribed_exercises pe
+      JOIN exercises e ON pe.exercise_id = e.id
+      JOIN prescriptions p ON pe.prescription_id = p.id
+      WHERE p.patient_id = ?
+    `).bind(patientId).all()
+
+    return c.json({
+      success: true,
+      data: {
+        movement_history: movementScores,
+        compliance_metrics: compliance
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ============================================================================
+// RAG (Retrieval-Augmented Generation) API
+// ============================================================================
+
+app.post('/api/rag/query', async (c) => {
+  try {
+    const { query } = await c.req.json<{ query: string }>()
+    const result = await queryExerciseKnowledge(c.env.DB, query)
+    return c.json({ success: true, data: result })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
@@ -851,20 +475,12 @@ es.*,
 // BILLING API
 // ============================================================================
 
-// Get CPT codes (with caching)
-app.get('/api/billing/codes', authMiddleware, async (c) => {
+// Get CPT codes
+app.get('/api/billing/codes', async (c) => {
   try {
-    const now = Date.now()
-    if (billingCodesCache && (now - lastBillingCacheTime < BILLING_CACHE_TTL)) {
-      return c.json({ success: true, data: billingCodesCache })
-    }
-
-    const { results } = await mockD1.prepare(`
-SELECT * FROM billing_codes ORDER BY cpt_code
-  `).all()
-
-    billingCodesCache = results
-    lastBillingCacheTime = now
+    const { results } = await c.env.DB.prepare(`
+      SELECT * FROM billing_codes ORDER BY cpt_code
+    `).all()
 
     return c.json({ success: true, data: results })
   } catch (error: any) {
@@ -873,31 +489,20 @@ SELECT * FROM billing_codes ORDER BY cpt_code
 })
 
 // Create billable event
-app.post('/api/billing/events', authMiddleware, async (c) => {
+app.post('/api/billing/events', async (c) => {
   try {
     const event = await c.req.json()
-    const clinician = c.get('clinician')
 
-    // Basic check: ensure patient belongs to clinician if patient_id is provided
-    if (event.patient_id) {
-      const patientCheck = await mockD1.prepare(`
-        SELECT id FROM patients WHERE id = ? AND created_by_clinician_id = ?
-  `).bind(event.patient_id, clinician.id).first()
-      if (!patientCheck) {
-        return c.json({ success: false, error: 'Patient not found or unauthorized' }, 404)
-      }
-    }
-
-    const result = await mockD1.prepare(`
-      INSERT INTO billable_events(
-    patient_id, assessment_id, exercise_session_id,
-    cpt_code_id, service_date, duration_minutes,
-    clinical_note, provider_id
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO billable_events (
+        patient_id, assessment_id, exercise_session_id,
+        cpt_code_id, service_date, duration_minutes,
+        clinical_note, provider_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       event.patient_id, event.assessment_id, event.exercise_session_id,
       event.cpt_code_id, event.service_date, event.duration_minutes,
-      event.clinical_note, clinician.id
+      event.clinical_note, event.provider_id || 1
     ).run()
 
     return c.json({ success: true, data: { id: result.meta.last_row_id } })
@@ -907,75 +512,54 @@ app.post('/api/billing/events', authMiddleware, async (c) => {
 })
 
 // ============================================================================
-// RAG & ANALYTICS API
-// ============================================================================
-
-app.post('/api/rag/query', authMiddleware, async (c) => {
-  try {
-    const { query } = await c.req.json<{ query: string }>()
-    const result = await queryExerciseKnowledge(mockD1, query)
-    return c.json({ success: true, data: result })
-  } catch (error: any) {
-    return c.json({ success: false, error: error.message }, 500)
-  }
-})
-
-// ============================================================================
 // MEDICAL NOTE GENERATION
 // ============================================================================
 
-app.post('/api/assessments/:id/generate-note', authMiddleware, async (c) => {
+app.post('/api/assessments/:id/generate-note', async (c) => {
   try {
     const assessmentId = c.req.param('id')
-    const clinician = c.get('clinician')
 
     // Get assessment data
-    const assessment = await mockD1.prepare(`
-      SELECT a.* FROM assessments a JOIN patients p ON a.patient_id = p.id
-      WHERE a.id = ? AND a.clinician_id = ? AND p.created_by_clinician_id = ?
-  `).bind(assessmentId, clinician.id, clinician.id).first() as any
-
-    if (!assessment) {
-      return c.json({ success: false, error: 'Assessment not found or unauthorized' }, 404)
-    }
+    const assessment = await c.env.DB.prepare(`
+      SELECT * FROM assessments WHERE id = ?
+    `).bind(assessmentId).first() as any
 
     // Get all movement tests and analyses
-    const { results: tests } = await mockD1.prepare(`
+    const { results: tests } = await c.env.DB.prepare(`
       SELECT mt.*, ma.*
-  FROM movement_tests mt
+      FROM movement_tests mt
       LEFT JOIN movement_analysis ma ON mt.id = ma.test_id
       WHERE mt.assessment_id = ?
-  `).bind(assessmentId).all()
+    `).bind(assessmentId).all()
+
+    // Enhanced clinical reasoning via RAG (prototype)
+    let aiInsights = ""
+    if (tests.length > 0 && tests[0].deficiencies) {
+      try {
+        const defs = JSON.parse(tests[0].deficiencies)
+        if (defs.length > 0) {
+          const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
+          aiInsights = ragResult.answer
+        }
+      } catch (e) {}
+    }
 
     // Generate comprehensive medical note
     const medicalNote = generateMedicalNote(assessment, tests)
-
-    // Try to enhance with AI insights if deficiencies exist
-    let aiInsights = ""
-    if (tests.length > 0 && tests[0].deficiencies && typeof tests[0].deficiencies === 'string') {
-      try {
-        const defs = JSON.parse(tests[0].deficiencies)
-        if (defs && Array.isArray(defs) && defs.length > 0) {
-          const ragResult = await queryExerciseKnowledge(mockD1, defs[0].area)
-          aiInsights = ragResult.answer
-        }
-      } catch (e) { }
-    }
-
     if (aiInsights) {
-      medicalNote.plan += `\n\nAI CLINICAL INSIGHTS: \n${aiInsights} `
+      medicalNote.assessment += `\n\nAI CLINICAL INSIGHT: ${aiInsights}`
     }
 
     // Update assessment with generated notes
-    await mockD1.prepare(`
+    await c.env.DB.prepare(`
       UPDATE assessments
       SET subjective_findings = ?,
-  objective_findings = ?,
-  assessment_summary = ?,
-  plan = ?,
-  status = 'completed'
+          objective_findings = ?,
+          assessment_summary = ?,
+          plan = ?,
+          status = 'completed'
       WHERE id = ?
-  `).bind(
+    `).bind(
       medicalNote.subjective,
       medicalNote.objective,
       medicalNote.assessment,
@@ -993,92 +577,12 @@ app.post('/api/assessments/:id/generate-note', authMiddleware, async (c) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-// Secure password hashing using PBKDF2 (production-grade alternative to bcrypt for Cloudflare Workers)
-async function hashPassword(password: string): Promise<string> {
-  const iterations = 100000
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const encoder = new TextEncoder()
-  const passwordKey = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  )
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: iterations,
-      hash: 'SHA-256'
-    },
-    passwordKey,
-    256
-  )
-
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('')
-
-  return `pbkdf2:${iterations}:${saltHex}:${hashHex}`
-}
-
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  // Support legacy hashes for demo transition
-  if (!storedHash || !storedHash.startsWith('pbkdf2:')) {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(password + 'physiomotion-salt-2025')
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const legacyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-    return legacyHash === (storedHash || '')
-  }
-
-  const parts = storedHash.split(':')
-  if (parts.length !== 4) return false
-
-  const [, iterationsStr, saltHex, hashHex] = parts
-  const iterations = parseInt(iterationsStr)
-  if (isNaN(iterations) || iterations <= 0) return false
-
-  // Convert hex salt back to Uint8Array
-  const saltMatch = saltHex.match(/.{1,2}/g)
-  if (!saltMatch) return false
-  const salt = new Uint8Array(saltMatch.map(byte => parseInt(byte, 16)))
-
-  const encoder = new TextEncoder()
-  const passwordKey = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  )
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: iterations,
-      hash: 'SHA-256'
-    },
-    passwordKey,
-    256
-  )
-
-  const computedHashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
-
-  // Safe comparison
-  return computedHashHex === hashHex
-}
-
 async function updateCompliancePercentage(db: any, prescribedExerciseId: number) {
   // Get total sessions completed vs expected
   const result = await db.prepare(`
     SELECT COUNT(*) as completed_count
     FROM exercise_sessions
-    WHERE prescribed_exercise_id = ? AND completed = true
+    WHERE prescribed_exercise_id = ? AND completed = 1
   `).bind(prescribedExerciseId).first() as any
 
   const prescription = await db.prepare(`
@@ -1086,30 +590,18 @@ async function updateCompliancePercentage(db: any, prescribedExerciseId: number)
   `).bind(prescribedExerciseId).first() as any
 
   if (result && prescription) {
-    const prescribedDate = new Date(prescription.prescribed_at)
-    const now = new Date()
-
-    // Don't calculate compliance for future dates
-    if (prescribedDate > now) {
-      return
-    }
-
-    // Calculate weeks since prescribed (minimum 1 week to avoid division by zero)
-    const weeksSincePrescribed = Math.max(1, Math.floor(
-      (now.getTime() - prescribedDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
-    ))
-
-    const expectedSessions = prescription.times_per_week * weeksSincePrescribed
-
-    // Calculate compliance percentage, capped at 100%
-    const compliance = Math.min(100, Math.round((result.completed_count / expectedSessions) * 100))
+    const weeksSincePrescribed = Math.floor(
+      (Date.now() - new Date(prescription.prescribed_at).getTime()) / (7 * 24 * 60 * 60 * 1000)
+    )
+    const expectedSessions = Math.max(1, prescription.times_per_week * weeksSincePrescribed)
+    const compliance = Math.min(100, (result.completed_count / expectedSessions) * 100)
 
     await db.prepare(`
       UPDATE prescribed_exercises
       SET compliance_percentage = ?,
-  last_performed_at = CURRENT_TIMESTAMP
+          last_performed_at = CURRENT_TIMESTAMP
       WHERE id = ?
-  `).bind(compliance, prescribedExerciseId).run()
+    `).bind(compliance, prescribedExerciseId).run()
   }
 }
 
@@ -1120,21 +612,17 @@ function generateMedicalNote(assessment: any, tests: any[]) {
   let avgQualityScore = 0
 
   for (const test of tests) {
-    if (test.deficiencies && typeof test.deficiencies === 'string') {
+    if (test.deficiencies) {
       try {
         const deficiencies = JSON.parse(test.deficiencies)
-        if (Array.isArray(deficiencies)) {
-          allDeficiencies.push(...deficiencies)
-        }
-      } catch (e) { }
+        allDeficiencies.push(...deficiencies)
+      } catch (e) {}
     }
-    if (test.ai_recommendations && typeof test.ai_recommendations === 'string') {
+    if (test.ai_recommendations) {
       try {
         const recs = JSON.parse(test.ai_recommendations)
-        if (Array.isArray(recs)) {
-          allRecommendations.push(...recs)
-        }
-      } catch (e) { }
+        allRecommendations.push(...recs)
+      } catch (e) {}
     }
     if (test.movement_quality_score) {
       avgQualityScore += test.movement_quality_score
@@ -1144,7 +632,7 @@ function generateMedicalNote(assessment: any, tests: any[]) {
   avgQualityScore = tests.length > 0 ? Math.round(avgQualityScore / tests.length) : 0
 
   // Generate SOAP note
-  const subjective = `Patient presents for ${assessment.assessment_type} assessment.Willing and able to participate in functional movement screening.`
+  const subjective = `Patient presents for ${assessment.assessment_type} assessment. Willing and able to participate in functional movement screening.`
 
   const objective = `
 FUNCTIONAL MOVEMENT ASSESSMENT RESULTS:
@@ -1162,34 +650,33 @@ Compensatory patterns observed and documented in biomechanical analysis.
   `.trim()
 
   const assessmentSummary = `
-Patient demonstrates ${avgQualityScore >= 80 ? 'good' : avgQualityScore >= 60 ? 'fair' : 'poor'} movement quality with ${allDeficiencies.length} significant deficiencies identified. 
+Patient demonstrates ${avgQualityScore >= 80 ? 'good' : avgQualityScore >= 60 ? 'fair' : 'poor'} movement quality with ${allDeficiencies.length} significant deficiencies identified.
 
 PRIMARY FINDINGS:
 ${allDeficiencies.slice(0, 3).map((d, i) => `${i + 1}. ${d.area} - ${d.severity} severity`).join('\n')}
 
 FUNCTIONAL IMPACT:
 ${avgQualityScore < 60 ? 'Significant functional limitations present. Patient would benefit from comprehensive therapeutic exercise program.' :
-      avgQualityScore < 80 ? 'Moderate functional limitations. Targeted interventions recommended.' :
-        'Minor limitations identified. Preventive exercise program appropriate.'
-    }
-`.trim()
+  avgQualityScore < 80 ? 'Moderate functional limitations. Targeted interventions recommended.' :
+  'Minor limitations identified. Preventive exercise program appropriate.'}
+  `.trim()
 
   const plan = `
 TREATMENT PLAN:
 
-1. THERAPEUTIC EXERCISES: Prescribed evidence - based exercise program targeting identified deficiencies
+1. THERAPEUTIC EXERCISES: Prescribed evidence-based exercise program targeting identified deficiencies
    ${allDeficiencies.slice(0, 3).map(d => `   - Address ${d.area}`).join('\n')}
 
 2. FREQUENCY: ${avgQualityScore < 60 ? '2-3x per week supervised therapy + daily HEP' : '1-2x per week supervised + daily HEP'}
 
 3. DURATION: ${avgQualityScore < 60 ? '8-12 weeks' : '4-8 weeks'}
 
-4. REMOTE MONITORING: Patient enrolled in remote therapeutic monitoring program(RTM)
-  - Daily exercise compliance tracking via mobile app
-    - Real - time form analysis and feedback
-      - Weekly progress reports
+4. REMOTE MONITORING: Patient enrolled in remote therapeutic monitoring program (RTM)
+   - Daily exercise compliance tracking via mobile app
+   - Real-time form analysis and feedback
+   - Weekly progress reports
 
-5. RE - ASSESSMENT: Schedule follow - up functional movement assessment in 4 weeks
+5. RE-ASSESSMENT: Schedule follow-up functional movement assessment in 4 weeks
 
 6. PATIENT EDUCATION:
 ${allRecommendations.slice(0, 3).map(r => `   - ${r}`).join('\n')}
@@ -1224,191 +711,164 @@ app.get('/patients', (c) => {
   return c.redirect('/static/patients')
 })
 
-// Login redirect
-app.get('/login', (c) => {
-  return c.redirect('/static/login.html')
-})
-
-app.get('/register', (c) => {
-  return c.redirect('/static/register.html')
-})
-
 // Main dashboard
 app.get('/', (c) => {
   return c.html(`
-  < !DOCTYPE html >
+    <!DOCTYPE html>
     <html lang="en">
-      <head>
+    <head>
         <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>PhysioMotion - Medical Movement Assessment Platform</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-            </head>
-            <body class="bg-gray-50">
-              <script>
-            // Check authentication on page load
-                const session = localStorage.getItem('clinician_session') || sessionStorage.getItem('clinician_session');
-                if (!session) {
-                  window.location.href = '/static/login.html';
-            }
-              </script>
-              <div id="app">
-                <!-- Navigation -->
-                <nav class="bg-white shadow-lg border-b-2 border-cyan-500">
-                  <div class="max-w-7xl mx-auto px-4">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PhysioMotion - Medical Movement Assessment Platform</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div id="app">
+            <!-- Navigation -->
+            <nav class="bg-white shadow-lg border-b-2 border-cyan-500">
+                <div class="max-w-7xl mx-auto px-4">
                     <div class="flex justify-between h-16">
-                      <div class="flex items-center">
-                        <i class="fas fa-heartbeat text-cyan-600 text-2xl mr-3"></i>
-                        <span class="text-xl font-bold text-slate-800">PhysioMotion</span>
-                      </div>
-                      <div class="flex items-center space-x-4">
-                        <a href="/" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-home mr-2"></i>Home</a>
-                        <a href="/patients" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-users mr-2"></i>Patients</a>
-                        <a href="/intake" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-user-plus mr-2"></i>New Patient</a>
-                        <a href="/assessment" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-video mr-2"></i>Assessment</a>
-                        <div class="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-300">
-                          <span id="clinicianName" class="text-gray-700 font-medium"></span>
-                          <button onclick="logout()" class="text-red-600 hover:text-red-700 transition-colors">
-                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
-                          </button>
+                        <div class="flex items-center">
+                            <i class="fas fa-heartbeat text-cyan-600 text-2xl mr-3"></i>
+                            <span class="text-xl font-bold text-slate-800">PhysioMotion</span>
                         </div>
-                      </div>
+                        <div class="flex items-center space-x-4">
+                            <a href="/" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-home mr-2"></i>Dashboard</a>
+                            <a href="/patients" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-users mr-2"></i>Patients</a>
+                            <a href="/assessments" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-clipboard-check mr-2"></i>Assessments</a>
+                            <a href="/monitoring" class="text-gray-700 hover:text-cyan-600 transition-colors"><i class="fas fa-chart-line mr-2"></i>Monitoring</a>
+                            <a href="#" onclick="startTelehealth()" class="text-rose-600 hover:text-rose-700 transition-colors"><i class="fas fa-video mr-2"></i>Telehealth</a>
+                            <button id="globalVoiceBtn" onclick="toggleGlobalVoice()" class="ml-4 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-sm flex items-center transition-colors">
+                                <i class="fas fa-microphone mr-2 text-cyan-600"></i>
+                                <span>Voice</span>
+                            </button>
+                        </div>
                     </div>
-                  </div>
-                </nav>
+                </div>
+            </nav>
 
-                <!-- Hero Section -->
-                <div class="bg-gradient-to-r from-cyan-600 to-purple-600 text-white py-16">
-                  <div class="max-w-7xl mx-auto px-4 text-center">
+            <!-- Hero Section -->
+            <div class="bg-gradient-to-r from-cyan-600 to-purple-600 text-white py-16">
+                <div class="max-w-7xl mx-auto px-4 text-center">
                     <h1 class="text-4xl font-bold mb-4">Medical Movement Assessment Platform</h1>
                     <p class="text-xl mb-8">AI-Powered Biomechanical Analysis for Physical Therapy & Chiropractic Care</p>
                     <div class="flex justify-center space-x-4">
-                      <button onclick="window.location.href='/intake'" class="bg-white text-cyan-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all">
-                        <i class="fas fa-user-plus mr-2"></i>New Patient Intake
-                      </button>
-                      <button onclick="window.location.href='/assessment'" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-400 transition-all">
-                        <i class="fas fa-video mr-2"></i>Start Assessment
-                      </button>
+                        <button onclick="window.location.href='/intake'" class="bg-white text-cyan-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all">
+                            <i class="fas fa-user-plus mr-2"></i>New Patient Intake
+                        </button>
+                        <button onclick="window.location.href='/assessment'" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-400 transition-all">
+                            <i class="fas fa-video mr-2"></i>Start Assessment
+                        </button>
                     </div>
-                  </div>
                 </div>
+            </div>
 
-                <!-- Features Grid -->
-                <div class="max-w-7xl mx-auto px-4 py-12">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Features Grid -->
+            <div class="max-w-7xl mx-auto px-4 py-12">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <!-- Feature 1 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-cyan-600 text-3xl mb-4"><i class="fas fa-camera"></i></div>
-                      <h3 class="text-xl font-bold mb-2">Real-Time Motion Capture</h3>
-                      <p class="text-gray-600">Advanced Orbbec Femto Mega integration with Azure Kinect Body Tracking SDK for professional clinical assessments</p>
+                        <div class="text-cyan-600 text-3xl mb-4"><i class="fas fa-camera"></i></div>
+                        <h3 class="text-xl font-bold mb-2">Real-Time Motion Capture</h3>
+                        <p class="text-gray-600">Advanced Orbbec Femto Mega integration with Azure Kinect Body Tracking SDK for professional clinical assessments</p>
                     </div>
 
                     <!-- Feature 2 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-purple-600 text-3xl mb-4"><i class="fas fa-brain"></i></div>
-                      <h3 class="text-xl font-bold mb-2">AI Biomechanical Analysis</h3>
-                      <p class="text-gray-600">Automated joint angle calculations, ROM measurements, and compensation pattern detection</p>
+                        <div class="text-purple-600 text-3xl mb-4"><i class="fas fa-brain"></i></div>
+                        <h3 class="text-xl font-bold mb-2">AI Biomechanical Analysis</h3>
+                        <p class="text-gray-600">Automated joint angle calculations, ROM measurements, and compensation pattern detection</p>
                     </div>
 
                     <!-- Feature 3 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-violet-600 text-3xl mb-4"><i class="fas fa-mobile-alt"></i></div>
-                      <h3 class="text-xl font-bold mb-2">Home Exercise Monitoring</h3>
-                      <p class="text-gray-600">MediaPipe Pose integration for remote patient monitoring via mobile camera with real-time feedback</p>
+                        <div class="text-violet-600 text-3xl mb-4"><i class="fas fa-mobile-alt"></i></div>
+                        <h3 class="text-xl font-bold mb-2">Home Exercise Monitoring</h3>
+                        <p class="text-gray-600">MediaPipe Pose integration for remote patient monitoring via mobile camera with real-time feedback</p>
                     </div>
 
                     <!-- Feature 4 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-rose-600 text-3xl mb-4"><i class="fas fa-file-medical"></i></div>
-                      <h3 class="text-xl font-bold mb-2">Automated Medical Notes</h3>
-                      <p class="text-gray-600">AI-generated SOAP notes with comprehensive deficiency documentation and treatment plans</p>
+                        <div class="text-rose-600 text-3xl mb-4"><i class="fas fa-file-medical"></i></div>
+                        <h3 class="text-xl font-bold mb-2">Automated Medical Notes</h3>
+                        <p class="text-gray-600">AI-generated SOAP notes with comprehensive deficiency documentation and treatment plans</p>
                     </div>
 
                     <!-- Feature 5 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-teal-600 text-3xl mb-4"><i class="fas fa-dumbbell"></i></div>
-                      <h3 class="text-xl font-bold mb-2">Exercise Prescription</h3>
-                      <p class="text-gray-600">Evidence-based exercise library with automated prescription based on identified deficiencies</p>
+                        <div class="text-teal-600 text-3xl mb-4"><i class="fas fa-dumbbell"></i></div>
+                        <h3 class="text-xl font-bold mb-2">Exercise Prescription</h3>
+                        <p class="text-gray-600">Evidence-based exercise library with automated prescription based on identified deficiencies</p>
                     </div>
 
                     <!-- Feature 6 -->
                     <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                      <div class="text-indigo-600 text-3xl mb-4"><i class="fas fa-dollar-sign"></i></div>
-                      <h3 class="text-xl font-bold mb-2">Medical Billing</h3>
-                      <p class="text-gray-600">Integrated CPT coding with RPM/RTM billing support for remote patient monitoring</p>
+                        <div class="text-indigo-600 text-3xl mb-4"><i class="fas fa-dollar-sign"></i></div>
+                        <h3 class="text-xl font-bold mb-2">Medical Billing</h3>
+                        <p class="text-gray-600">Integrated CPT coding with RPM/RTM billing support for remote patient monitoring</p>
                     </div>
-                  </div>
                 </div>
+            </div>
 
-                <!-- Stats Section -->
-                <div class="bg-gradient-to-r from-slate-50 to-slate-100 py-12">
-                  <div class="max-w-7xl mx-auto px-4">
+            <!-- Stats Section -->
+            <div class="bg-gradient-to-r from-slate-50 to-slate-100 py-12">
+                <div class="max-w-7xl mx-auto px-4">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
-                      <div>
-                        <div class="text-4xl font-bold text-cyan-600">32</div>
-                        <div class="text-gray-600">Joint Points Tracked</div>
-                      </div>
-                      <div>
-                        <div class="text-4xl font-bold text-purple-600">15+</div>
-                        <div class="text-gray-600">Evidence-Based Exercises</div>
-                      </div>
-                      <div>
-                        <div class="text-4xl font-bold text-violet-600">Real-Time</div>
-                        <div class="text-gray-600">Analysis & Feedback</div>
-                      </div>
-                      <div>
-                        <div class="text-4xl font-bold text-teal-600">92%</div>
-                        <div class="text-gray-600">AI Confidence Score</div>
-                      </div>
+                        <div>
+                            <div class="text-4xl font-bold text-cyan-600">32</div>
+                            <div class="text-gray-600">Joint Points Tracked</div>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-bold text-purple-600">15+</div>
+                            <div class="text-gray-600">Evidence-Based Exercises</div>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-bold text-violet-600">Real-Time</div>
+                            <div class="text-gray-600">Analysis & Feedback</div>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-bold text-teal-600">92%</div>
+                            <div class="text-gray-600">AI Confidence Score</div>
+                        </div>
                     </div>
-                  </div>
                 </div>
+            </div>
 
-                <!-- Footer -->
-                <footer class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-8 border-t-4 border-cyan-500">
-                  <div class="max-w-7xl mx-auto px-4 text-center">
+            <!-- Footer -->
+            <footer class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-8 border-t-4 border-cyan-500">
+                <div class="max-w-7xl mx-auto px-4 text-center">
                     <p>&copy; 2025 PhysioMotion. Medical-Grade Movement Assessment Platform.</p>
                     <p class="text-sm text-slate-400 mt-2">Powered by Orbbec Femto Mega, Azure Kinect Body Tracking SDK, and MediaPipe Pose</p>
-                  </div>
-                </footer>
-              </div>
+                </div>
+            </footer>
+        </div>
 
-              <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-              <script>
-            // Display logged-in clinician info
-                function displayClinicianInfo() {
-                const session = localStorage.getItem('clinician_session') || sessionStorage.getItem('clinician_session');
-                if (session) {
-                    try {
-                        const clinician = JSON.parse(session);
-                const nameElement = document.getElementById('clinicianName');
-                if (nameElement) {
-                            const demoLabel = clinician.is_demo ? ' <span class="text-xs bg-violet-500 text-white px-2 py-1 rounded">DEMO</span>' : '';
-                nameElement.innerHTML = '<i class="fas fa-user-md mr-1"></i>' + clinician.first_name + ' ' + clinician.last_name + (clinician.title ? ', ' + clinician.title : '') + demoLabel;
-                        }
-                    } catch (e) {
-                  console.error('Error parsing session:', e);
-                    }
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/app.js"></script>
+        <script>
+            function toggleGlobalVoice() {
+                const btn = document.getElementById('globalVoiceBtn');
+                const service = window.PhysioMotion.VoiceControl;
+                if (service.isListening) {
+                    service.stop();
+                    btn.classList.remove('bg-cyan-100', 'ring-2', 'ring-cyan-500');
+                    btn.classList.add('bg-slate-100');
+                } else {
+                    service.start();
+                    btn.classList.remove('bg-slate-100');
+                    btn.classList.add('bg-cyan-100', 'ring-2', 'ring-cyan-500');
                 }
             }
 
-                // Logout function
-                function logout() {
-                if (confirm('Are you sure you want to logout?')) {
-                  localStorage.removeItem('clinician_session');
-                sessionStorage.removeItem('clinician_session');
-                window.location.href = '/static/login.html';
-                }
+            function startTelehealth() {
+                alert("Initializing PhysioMotion Telehealth Secure Video Call...\n\nStatus: Waiting for Peer Connection.");
+                window.PhysioMotion.VoiceFeedback.speak("Initializing telehealth video call.");
             }
-
-                // Initialize on page load
-                displayClinicianInfo();
-              </script>
-            </body>
-          </html>
-          `)
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 export default app
-validateEnv();

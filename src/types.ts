@@ -1,46 +1,8 @@
 // TypeScript Type Definitions for Medical Movement Assessment Platform
 
-// Mock types for non-Cloudflare environments
-export type D1Database = {
-  prepare: (query: string) => D1PreparedStatement;
-  batch: (statements: D1PreparedStatement[]) => Promise<D1Result[]>;
-  exec: (query: string) => Promise<D1Result>;
-}
-
-export type D1PreparedStatement = {
-  bind: (...args: any[]) => D1PreparedStatement;
-  first: <T = any>(column?: string) => Promise<T | null>;
-  all: <T = any>() => Promise<D1Result<T>>;
-  run: () => Promise<D1Result>;
-}
-
-export type D1Result<T = any> = {
-  results: T[];
-  success: boolean;
-  meta: any;
-  error?: string;
-}
-
-export type R2Bucket = any;
-
 export type Bindings = {
   DB: D1Database;
   R2: R2Bucket;
-  JWT_SECRET?: string;
-  AUTH_SECRET?: string;
-  AUTH_DOMAIN?: string;
-}
-
-export type Variables = {
-  clinician: {
-    id: number;
-    email: string;
-    role: string;
-    clinic_id?: number;
-  };
-  clinicianId: number;
-  validatedData: any;
-  validatedId: number;
 }
 
 // ============================================================================
@@ -481,13 +443,6 @@ export interface JointAngle {
   bilateral_difference?: number;
   normal_range: [number, number]; // [min, max]
   status: 'normal' | 'limited' | 'excessive';
-}
-
-export interface ClinicalJointAngle extends JointAngle {
-  confidence: number;
-  method: '3d' | '2d';
-  clinicalSignificance: 'normal' | 'limited' | 'excessive' | 'borderline';
-  deviationFromNorm: number;
 }
 
 export interface BiomechanicalAnalysis {

@@ -1,19 +1,14 @@
 {
-  "name": "physiomotion",
-  "version": "1.0.0",
-  "description": "Medical-Grade Movement Assessment Platform",
+  "name": "webapp",
   "type": "module",
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "scripts": {
     "dev": "vite",
     "dev:sandbox": "wrangler pages dev dist --ip 0.0.0.0 --port 3000",
-    "dev:d1": "wrangler pages dev dist --d1=DB --local --ip 0.0.0.0 --port 3000",
+    "dev:d1": "wrangler pages dev dist --d1=physiomotion-production --local --ip 0.0.0.0 --port 3000",
     "build": "vite build",
     "preview": "wrangler pages dev dist",
-    "deploy": "npm run build && wrangler deploy",
-    "deploy:prod": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy:prod": "npm run build && wrangler pages deploy dist --project-name physiomotion",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
     "test": "curl http://localhost:3000",
@@ -26,17 +21,14 @@
     "git:commit": "git add . && git commit -m"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.11",
-    "@neondatabase/serverless": "^0.9.3",
-    "hono": "^4.10.1",
-    "pg": "^8.20.0",
-    "zod": "^3.22.4"
+    "hono": "^4.10.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
-    "@hono/vite-build": "^1.3.0",
+    "@hono/vite-build": "^1.2.0",
     "@hono/vite-dev-server": "^0.18.2",
     "typescript": "^5.0.0",
-    "vite": "^5.2.0"
+    "vite": "^6.3.5",
+    "wrangler": "^4.4.0"
   }
 }

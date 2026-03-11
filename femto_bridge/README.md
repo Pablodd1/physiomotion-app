@@ -12,7 +12,7 @@ Test the WebSocket integration without actual hardware:
 cd /home/user/webapp/femto_bridge
 
 # Install Python dependencies
-pip install -r requirements_manual.txt
+pip install -r requirements.txt
 
 # Run server in simulation mode
 python server.py --simulate
@@ -63,12 +63,12 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  
+
   if (data.type === 'connected') {
     console.log('Bridge server ready');
     console.log('Simulation mode:', data.simulation);
   }
-  
+
   if (data.type === 'skeleton') {
     const skeleton = data.skeleton;
     console.log('Body ID:', skeleton.body_id);

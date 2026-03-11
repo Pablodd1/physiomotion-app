@@ -7,14 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="/static/styles.css" rel="stylesheet">
-    <script src="/static/notifications.js"></script>
-    <script src="/static/auth.js"></script>
 </head>
 <body class="bg-gray-50">
-    <script>
-        // Check authentication
-        checkAuth();
-    </script>
     <!-- Navigation -->
     <nav class="bg-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4">
@@ -28,12 +22,10 @@
                     <a href="/intake" class="text-gray-700 hover:text-blue-600"><i class="fas fa-clipboard-list mr-2"></i>Intake</a>
                     <a href="/patients" class="text-blue-600 font-semibold"><i class="fas fa-users mr-2"></i>Patients</a>
                     <a href="/assessment" class="text-gray-700 hover:text-blue-600"><i class="fas fa-video mr-2"></i>Assessment</a>
-                    <div class="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-300">
-                        <span id="clinicianName" class="text-gray-700 font-medium"></span>
-                        <button onclick="logout()" class="text-red-600 hover:text-red-700 transition-colors">
-                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
-                        </button>
-                    </div>
+                    <button id="globalVoiceBtn" onclick="toggleGlobalVoice()" class="ml-4 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm flex items-center transition-colors">
+                        <i class="fas fa-microphone mr-2 text-blue-600"></i>
+                        <span>Voice</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -57,7 +49,7 @@
         <div class="bg-white rounded-lg shadow p-4 mb-6">
             <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
                 <div class="flex-1 mb-4 md:mb-0">
-                    <input type="text" id="searchInput" placeholder="Search patients..." 
+                    <input type="text" id="searchInput" placeholder="Search patients..."
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <button onclick="loadPatients()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -104,42 +96,116 @@
         </div>
     </div>
 
+    <!-- Progress Modal -->
+    <div id="progressModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Patient Progress Tracking</h3>
+                <button onclick="closeModal()" class="text-gray-600 hover:text-gray-900 text-3xl">&times;</button>
+            </div>
+            <div id="analyticsContent" class="space-y-6">
+                <!-- Analytics data will be inserted here -->
+            </div>
+            <div class="mt-6 text-right">
+                <button onclick="closeModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
     <script>
-        // Utility function to escape HTML and prevent XSS
-        function escapeHtml(text) {
-            if (!text) return text;
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function closeModal() {
+            document.getElementById('progressModal').classList.add('hidden');
+        }
+
+        async function viewProgress(patientId) {
+            const modal = document.getElementById('progressModal');
+            const content = document.getElementById('analyticsContent');
+            modal.classList.remove('hidden');
+            content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-blue-600"></i></div>';
+
+            try {
+                const response = await fetch(`/api/patients/${patientId}/analytics`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const { movement_history, compliance_metrics } = result.data;
+
+                    let html = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h4 class="font-bold mb-3 text-blue-800">Movement Quality History</h4>
+                                ${movement_history.length > 0 ? `
+                                    <ul class="space-y-2">
+                                        ${movement_history.map(h => `
+                                            <li class="flex justify-between items-center border-b border-blue-100 pb-1">
+                                                <span class="text-sm">${new Date(h.assessment_date).toLocaleDateString()}</span>
+                                                <span class="font-semibold text-blue-600">${h.movement_quality_score}/100</span>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                ` : '<p class="text-sm text-gray-500 italic">No history available</p>'}
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h4 class="font-bold mb-3 text-green-800">Exercise Compliance</h4>
+                                ${compliance_metrics && compliance_metrics.length > 0 ? `
+                                    <ul class="space-y-2">
+                                        ${compliance_metrics.map(c => `
+                                            <li class="space-y-1">
+                                                <div class="flex justify-between text-sm">
+                                                    <span>${c.exercise_name}</span>
+                                                    <span class="font-bold">${Math.round(c.compliance_percentage || 0)}%</span>
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                                    <div class="bg-green-600 h-2 rounded-full" style="width: ${c.compliance_percentage || 0}%"></div>
+                                                </div>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                ` : '<p class="text-sm text-gray-500 italic">No prescriptions found</p>'}
+                            </div>
+                        </div>
+                    `;
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = `<p class="text-red-500">Error: ${result.error}</p>`;
+                }
+            } catch (error) {
+                content.innerHTML = `<p class="text-red-500">Failed to load analytics</p>`;
+            }
+        }
+
+        function toggleGlobalVoice() {
+            const btn = document.getElementById('globalVoiceBtn');
+            const service = window.PhysioMotion.VoiceControl;
+            if (service.isListening) {
+                service.stop();
+                btn.classList.remove('bg-blue-100', 'ring-2', 'ring-blue-500');
+                btn.classList.add('bg-gray-100');
+            } else {
+                service.start();
+                btn.classList.remove('bg-gray-100');
+                btn.classList.add('bg-blue-100', 'ring-2', 'ring-blue-500');
+            }
         }
 
         async function loadPatients() {
             const tableBody = document.getElementById('patientsTableBody');
             const loadingState = document.getElementById('loadingState');
             const emptyState = document.getElementById('emptyState');
-            
+
             loadingState.classList.remove('hidden');
             tableBody.innerHTML = '';
-            emptyState.classList.add('hidden');
-            
+
             try {
                 const response = await fetch('/api/patients');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
                 const result = await response.json();
-                
+
                 loadingState.classList.add('hidden');
-                
-                if (!result.success) {
-                    throw new Error(result.error || 'Failed to load patients');
-                }
-                
-                if (result.data && result.data.length > 0) {
+
+                if (result.success && result.data && result.data.length > 0) {
                     emptyState.classList.add('hidden');
-                    
+
                     result.data.forEach(patient => {
                         const row = document.createElement('tr');
                         row.className = 'hover:bg-gray-50';
@@ -150,22 +216,25 @@
                                         <i class="fas fa-user text-blue-600"></i>
                                     </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900">${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}</div>
+                                        <div class="text-sm font-medium text-gray-900">${patient.first_name} ${patient.last_name}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(patient.date_of_birth) || 'N/A'}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(patient.email) || 'N/A'}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(patient.phone) || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${patient.date_of_birth || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${patient.email || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${patient.phone || 'N/A'}</td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                     Active
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <a href="/assessment?patient_id=${patient.id}" class="text-blue-600 hover:text-blue-900 mr-4">
+                                <a href="/static/assessment?patient_id=${patient.id}" class="text-blue-600 hover:text-blue-900 mr-4">
                                     <i class="fas fa-video mr-1"></i>Assess
                                 </a>
+                                <button onclick="viewProgress(${patient.id})" class="text-purple-600 hover:text-purple-900 mr-4">
+                                    <i class="fas fa-chart-line mr-1"></i>Progress
+                                </button>
                                 <a href="/patients/${patient.id}" class="text-gray-600 hover:text-gray-900">
                                     <i class="fas fa-eye mr-1"></i>View
                                 </a>
@@ -173,8 +242,6 @@
                         `;
                         tableBody.appendChild(row);
                     });
-                    
-                    showSuccess(`Loaded ${result.data.length} patient(s)`, 2000);
                 } else {
                     emptyState.classList.remove('hidden');
                 }
@@ -182,7 +249,6 @@
                 loadingState.classList.add('hidden');
                 emptyState.classList.remove('hidden');
                 console.error('Error loading patients:', error);
-                showError(`Failed to load patients: ${error.message}`);
             }
         }
 
@@ -197,8 +263,6 @@
                 loadPatients();
             }
         });
-        // Display clinician info on page load
-        displayClinicianInfo();
     </script>
 </body>
 </html>

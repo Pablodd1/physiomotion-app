@@ -7,14 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="/static/styles.css" rel="stylesheet">
-    <script src="/static/notifications.js"></script>
-    <script src="/static/auth.js"></script>
 </head>
 <body class="bg-gray-50">
-    <script>
-        // Check authentication
-        checkAuth();
-    </script>
     <!-- Navigation -->
     <nav class="bg-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4">
@@ -26,12 +20,10 @@
                 <div class="flex items-center space-x-4">
                     <a href="/" class="text-gray-700 hover:text-blue-600"><i class="fas fa-home mr-2"></i>Home</a>
                     <a href="/assessment" class="text-blue-600 font-semibold"><i class="fas fa-video mr-2"></i>Assessment</a>
-                    <div class="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-300">
-                        <span id="clinicianName" class="text-gray-700 font-medium"></span>
-                        <button onclick="logout()" class="text-red-600 hover:text-red-700 transition-colors">
-                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
-                        </button>
-                    </div>
+                    <button id="globalVoiceBtn" onclick="toggleGlobalVoice()" class="ml-4 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm flex items-center transition-colors">
+                        <i class="fas fa-microphone mr-2 text-blue-600"></i>
+                        <span>Voice</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -63,33 +55,33 @@
         <div id="cameraSelectionModal" class="camera-selection-modal">
             <div class="camera-selection-content">
                 <h2><i class="fas fa-camera mr-2"></i>Select Camera Type</h2>
-                
+
                 <div class="camera-options">
                     <div class="camera-option" onclick="selectCameraType('phone')">
                         <i class="fas fa-mobile-alt"></i>
                         <h3>Mobile Phone</h3>
                         <p>Use your smartphone camera (front or back)</p>
                     </div>
-                    
+
                     <div class="camera-option" onclick="selectCameraType('webcam')">
                         <i class="fas fa-laptop"></i>
                         <h3>Laptop Camera</h3>
                         <p>Use built-in or external webcam</p>
                     </div>
-                    
+
                     <div class="camera-option" onclick="selectCameraType('femto')">
                         <i class="fas fa-video"></i>
                         <h3>Femto Mega</h3>
                         <p>Professional motion capture camera</p>
                     </div>
-                    
+
                     <div class="camera-option" onclick="selectCameraType('upload')">
                         <i class="fas fa-file-video"></i>
                         <h3>Upload Video</h3>
                         <p>Analyze pre-recorded video</p>
                     </div>
                 </div>
-                
+
                 <div class="text-center">
                     <button onclick="checkCameraPermissions()" class="camera-btn" style="background: #6366f1; color: white; margin-bottom: 1rem;">
                         <i class="fas fa-shield-alt"></i>
@@ -109,23 +101,23 @@
             <div class="video-wrapper">
                 <!-- Video Element -->
                 <video id="videoElement" autoplay playsinline></video>
-                
+
                 <!-- Canvas for Skeleton Overlay -->
                 <canvas id="canvasElement"></canvas>
-                
+
                 <!-- Recording Indicator -->
                 <div id="recordingIndicator" class="recording-indicator" style="display: none;">
                     <div class="recording-dot"></div>
                     <span>RECORDING</span>
                     <span id="recordingTime">00:00</span>
                 </div>
-                
+
                 <!-- Camera Status -->
                 <div id="cameraStatus" class="camera-status disconnected">
                     <i class="fas fa-circle mr-2"></i>
                     <span id="statusText">Disconnected</span>
                 </div>
-                
+
                 <!-- Joint Info Panel -->
                 <div id="jointInfoPanel" class="joint-info-panel" style="display: none;">
                     <h3><i class="fas fa-chart-line mr-2"></i>Live Joint Angles</h3>
@@ -133,7 +125,7 @@
                         <!-- Joint angles will be inserted here dynamically -->
                     </div>
                 </div>
-                
+
                 <!-- Advanced Features Controls -->
                 <div class="camera-controls-advanced mb-4 flex justify-center gap-2">
                     <button onclick="toggleFeature('ghostMode')" class="feature-btn bg-gray-700 text-white px-3 py-1 rounded-full text-sm opacity-50 hover:opacity-100 transition-opacity" id="btn-ghostMode">
@@ -145,6 +137,9 @@
                     <button onclick="toggleFeature('repCounter')" class="feature-btn bg-gray-700 text-white px-3 py-1 rounded-full text-sm opacity-50 hover:opacity-100 transition-opacity" id="btn-repCounter">
                         <i class="fas fa-dumbbell mr-1"></i> Rep Counter
                     </button>
+                    <button onclick="toggleFeature('voiceControl')" class="feature-btn bg-gray-700 text-white px-3 py-1 rounded-full text-sm opacity-50 hover:opacity-100 transition-opacity" id="btn-voiceControl">
+                        <i class="fas fa-microphone mr-1"></i> Voice Control
+                    </button>
                 </div>
 
                 <!-- Camera Controls -->
@@ -153,17 +148,17 @@
                         <i class="fas fa-sync-alt"></i>
                         <span id="flipBtnText">Flip Camera</span>
                     </button>
-                    
+
                     <button onclick="startRecording()" class="camera-btn success" id="recordBtn">
                         <i class="fas fa-record-vinyl"></i>
                         Start Recording
                     </button>
-                    
+
                     <button onclick="stopRecording()" class="camera-btn danger" id="stopBtn" style="display: none;">
                         <i class="fas fa-stop"></i>
                         Stop Recording
                     </button>
-                    
+
                     <button onclick="analyzeMovement()" class="camera-btn primary" id="analyzeBtn" style="display: none;">
                         <i class="fas fa-brain"></i>
                         Analyze Movement
@@ -179,7 +174,7 @@
                     <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
                     Analysis Results
                 </h2>
-                
+
                 <!-- Movement Quality Score -->
                 <div class="mb-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                     <div class="flex items-center justify-between">
@@ -193,7 +188,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Detected Deficiencies -->
                 <div class="mb-6">
                     <h3 class="text-xl font-bold mb-4">
@@ -204,7 +199,7 @@
                         <!-- Deficiencies will be inserted here -->
                     </div>
                 </div>
-                
+
                 <!-- Recommended Exercises -->
                 <div class="mb-6">
                     <h3 class="text-xl font-bold mb-4">
@@ -215,24 +210,24 @@
                         <!-- Exercises will be inserted here -->
                     </div>
                 </div>
-                
+
                 <!-- Action Buttons -->
                 <div class="flex gap-4">
                     <button onclick="generateMedicalNote()" class="camera-btn primary">
                         <i class="fas fa-file-medical"></i>
                         Generate Medical Note
                     </button>
-                    
+
                     <button onclick="prescribeExercises()" class="camera-btn success">
                         <i class="fas fa-prescription"></i>
                         Prescribe Exercises
                     </button>
-                    
+
                     <button onclick="window.print()" class="camera-btn" style="background: #4b5563; color: white;">
                         <i class="fas fa-file-pdf"></i>
                         Download Report
                     </button>
-                    
+
                     <button onclick="startNewAssessment()" class="camera-btn" style="background: #6b7280; color: white;">
                         <i class="fas fa-redo"></i>
                         New Assessment
@@ -242,102 +237,28 @@
         </div>
     </div>
 
-    <!-- Voice Control Panel (Right Side) -->
-    <div class="voice-control-panel" id="voicePanel">
-        <button id="voiceBtn" class="voice-btn" aria-label="Voice Commands" title="Click or say 'help' for commands">
-            <span id="voiceIcon">🎤</span>
-            <span class="voice-status-indicator" id="voiceStatus"></span>
-        </button>
-        <div class="voice-panel-mini">
-            <button class="voice-btn voice-mini-btn" onclick="window.VoiceCommand && window.VoiceCommand.start()" title="Start Listening">▶️</button>
-            <button class="voice-btn voice-mini-btn" onclick="window.VoiceCommand && window.VoiceCommand.stop()" title="Stop Listening">⏹️</button>
-            <button class="voice-btn voice-mini-btn" onclick="showVoiceHelp()" title="Show Commands">❓</button>
-        </div>
-    </div>
-
-    <!-- Voice Feedback Toast -->
-    <div class="voice-feedback" id="voiceFeedback">Listening...</div>
-
-    <!-- Voice Commands Tooltip -->
-    <div class="voice-commands-tooltip" id="voiceTooltip">
-        <h4>Voice Commands</h4>
-        <ul>
-            <li>Start/Stop recording</li>
-            <li>Analyze movement</li>
-            <li>Flip camera</li>
-            <li>Show patients</li>
-            <li>Generate notes</li>
-            <li>Save assessment</li>
-            <li>Next / Previous</li>
-            <li>Take screenshot</li>
-        </ul>
-    </div>
-
     <!-- MediaPipe Pose Detection -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-    
-    <!-- Femto Mega Client -->
-    <script src="/static/femto-client.js"></script>
 
-    <!-- Main Application Script -->
+    <!-- Main Application Scripts -->
+    <script src="/static/app.js"></script>
     <script src="/static/assessment-workflow.js"></script>
     <script>
-        // Display clinician info on page load
-        displayClinicianInfo();
-        
-        // Initialize voice command when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            const voiceBtn = document.getElementById('voiceBtn');
-            const voiceFeedback = document.getElementById('voiceFeedback');
-            const voiceStatus = document.getElementById('voiceStatus');
-            
-            if (window.VoiceCommand) {
-                const status = window.VoiceCommand.getStatus();
-                if (status.isSupported) {
-                    voiceBtn.classList.add('supported');
-                    voiceStatus.classList.add('supported');
-                }
-                window.VoiceCommand.setFeedbackElement(voiceFeedback);
-                window.VoiceCommand.setStatusElement(voiceStatus);
+        function toggleGlobalVoice() {
+            const btn = document.getElementById('globalVoiceBtn');
+            const service = window.PhysioMotion.VoiceControl;
+            if (service.isListening) {
+                service.stop();
+                btn.classList.remove('bg-blue-100', 'ring-2', 'ring-blue-500');
+                btn.classList.add('bg-gray-100');
+            } else {
+                service.start();
+                btn.classList.remove('bg-gray-100');
+                btn.classList.add('bg-blue-100', 'ring-2', 'ring-blue-500');
             }
-            
-            // Voice button click handler
-            voiceBtn.addEventListener('click', () => {
-                if (window.VoiceCommand) {
-                    window.VoiceCommand.toggle();
-                    const status = window.VoiceCommand.getStatus();
-                    if (status.isListening) {
-                        voiceBtn.classList.add('listening');
-                        document.getElementById('voiceIcon').textContent = '🔊';
-                        voiceFeedback.textContent = 'Listening...';
-                        voiceFeedback.classList.add('visible');
-                    } else {
-                        voiceBtn.classList.remove('listening');
-                        document.getElementById('voiceIcon').textContent = '🎤';
-                        voiceFeedback.classList.remove('visible');
-                    }
-                }
-            });
-            
-            // Keyboard shortcut (V key)
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
-                    const active = document.activeElement;
-                    if (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                        voiceBtn.click();
-                    }
-                }
-            });
-        });
-        
-        function showVoiceHelp() {
-            const tooltip = document.getElementById('voiceTooltip');
-            tooltip.classList.toggle('visible');
-            setTimeout(() => tooltip.classList.remove('visible'), 10000);
         }
     </script>
 </body>

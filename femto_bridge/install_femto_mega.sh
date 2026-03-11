@@ -39,12 +39,12 @@ if [ "$OS" = "linux" ]; then
         python3-dev python3-pip \
         usbutils
     echo "✅ System dependencies installed"
-    
+
 elif [ "$OS" = "mac" ]; then
     echo "Installing macOS dependencies..."
     brew install libusb cmake python3
     echo "✅ System dependencies installed"
-    
+
 elif [ "$OS" = "windows" ]; then
     echo "⚠️  Windows detected"
     echo "Please ensure you have:"
@@ -88,40 +88,40 @@ echo "============================================================"
 
 if [ "$OS" = "linux" ] || [ "$OS" = "mac" ]; then
     cd "$SDK_DIR"
-    
+
     if [ -d "build" ]; then
         echo "Cleaning previous build..."
         rm -rf build
     fi
-    
+
     mkdir -p build
     cd build
-    
+
     echo "Running CMake..."
     cmake ..
-    
+
     echo "Building SDK..."
     make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-    
+
     echo "Installing SDK..."
     sudo make install
-    
+
     echo "✅ OrbbecSDK_v2 built and installed"
-    
+
     # Configure USB rules (Linux only)
     if [ "$OS" = "linux" ]; then
         echo "Configuring USB permissions..."
         sudo cp ../misc/99-obsensor-libusb.rules /etc/udev/rules.d/ 2>/dev/null || true
         sudo udevadm control --reload-rules 2>/dev/null || true
         sudo udevadm trigger 2>/dev/null || true
-        
+
         # Add user to plugdev group
         sudo usermod -a -G plugdev $USER 2>/dev/null || true
-        
+
         echo "✅ USB permissions configured"
         echo "⚠️  You may need to log out and back in for USB permissions"
     fi
-    
+
 elif [ "$OS" = "windows" ]; then
     echo "⚠️  Windows build requires Visual Studio"
     echo "Please build manually or download pre-built binaries from:"
@@ -141,21 +141,6 @@ pip3 install --user websockets
 pip3 install --user numpy
 pip3 install --user opencv-python
 
-# Try to install pyk4a (optional, for Body Tracking)
-echo "Attempting to install pyk4a (for Azure Kinect Body Tracking)..."
-if pip3 install --user pyk4a; then
-    echo "✅ pyk4a installed successfully"
-else
-    echo "⚠️  pyk4a installation failed (this is expected if Azure Kinect SDK is not installed)"
-    echo "    The system will fall back to native Orbbec SDK or simulation."
-fi
-
-# Ensure requirements file is present
-if [ -f "python_requirements.txt" ]; then
-    echo "Ensuring all requirements from python_requirements.txt are met..."
-    pip3 install --user -r python_requirements.txt || echo "⚠️ Some requirements failed to install"
-fi
-
 echo "✅ Python dependencies installed"
 
 echo ""
@@ -172,19 +157,19 @@ cat > /tmp/test_femto_mega.py << 'PYTHON_EOF'
 try:
     from pyorbbecsdk import Pipeline, Config
     import sys
-    
+
     print("✅ pyorbbecsdk imported successfully")
     print("🔍 Attempting to connect to Femto Mega camera...")
-    
+
     # Try to create pipeline
     pipeline = Pipeline()
     print("✅ Pipeline created")
-    
+
     # Try to start device
     config = Config()
     pipeline.start(config)
     print("✅ Camera started successfully!")
-    
+
     # Get a frame to verify
     frames = pipeline.wait_for_frames(timeout_ms=1000)
     if frames:
@@ -192,15 +177,15 @@ try:
         print("✅✅✅ FEMTO MEGA IS WORKING! ✅✅✅")
     else:
         print("⚠️  No frames received (camera may not be connected)")
-    
+
     pipeline.stop()
     sys.exit(0)
-    
+
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Please install: pip3 install pyorbbecsdk")
     sys.exit(1)
-    
+
 except Exception as e:
     print(f"❌ Error: {e}")
     print("")

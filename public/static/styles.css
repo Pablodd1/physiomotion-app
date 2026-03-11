@@ -552,10 +552,10 @@ body {
    ============================================================================ */
 @media print {
   /* Hide non-printable elements */
-  nav, 
-  .progress-steps, 
-  .camera-btn, 
-  #cameraContainer, 
+  nav,
+  .progress-steps,
+  .camera-btn,
+  #cameraContainer,
   .toast,
   .camera-selection-modal,
   .flex.gap-4 { /* Hide action buttons */
@@ -592,7 +592,7 @@ body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  
+
   /* Report Header */
   #resultsContainer::before {
     content: "PhysioMotion Assessment Report";
@@ -622,63 +622,63 @@ body {
     flex-direction: column;
     width: 90%;
   }
-  
+
   .camera-btn {
     width: 100%;
     justify-content: center;
   }
-  
+
   .joint-info-panel {
     width: calc(100% - 40px);
     right: 20px;
     left: 20px;
     max-height: 300px;
   }
-  
+
   .camera-options {
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  
+
   .camera-option {
     padding: 20px 15px;
   }
-  
+
   .camera-option i {
     font-size: 36px;
     margin-bottom: 8px;
   }
-  
+
   .camera-option h3 {
     font-size: 16px;
     margin-bottom: 4px;
   }
-  
+
   .camera-option p {
     font-size: 12px;
   }
-  
+
   .camera-selection-content {
     padding: 20px;
     max-height: 90vh;
     overflow-y: auto;
   }
-  
+
   .camera-selection-content h2 {
     font-size: 20px;
     margin-bottom: 16px;
   }
-  
+
   .progress-steps {
     flex-wrap: wrap;
     gap: 10px;
   }
-  
+
   .progress-step {
     margin-bottom: 0;
     min-width: 60px;
   }
-  
+
   .progress-step-label {
     font-size: 11px;
   }
@@ -696,23 +696,23 @@ body {
     max-width: none;
     z-index: 100;
   }
-  
+
   .video-wrapper {
     padding-bottom: 0;
     height: 100%;
   }
-  
+
   #videoElement {
     object-fit: cover;
     width: 100%;
     height: 100%;
   }
-  
+
   #canvasElement {
     width: 100%;
     height: 100%;
   }
-  
+
   .camera-controls {
     position: fixed;
     bottom: 20px;
@@ -734,32 +734,32 @@ body {
     width: 90%;
     flex-wrap: wrap;
   }
-  
+
   .camera-btn {
     padding: 12px 20px;
     font-size: 14px;
     flex: 1;
     min-width: 120px;
   }
-  
+
   .recording-indicator {
     top: 20px;
     left: 20px;
     padding: 8px 16px;
     font-size: 13px;
   }
-  
+
   .camera-status {
     top: 20px;
     right: 20px;
     font-size: 13px;
   }
-  
+
   .camera-selection-modal {
     align-items: flex-start;
     padding-top: 0;
   }
-  
+
   .camera-selection-content {
     padding: 16px;
     width: 100%;
@@ -768,63 +768,63 @@ body {
     max-height: 100vh;
     overflow-y: auto;
   }
-  
+
   .camera-selection-content h2 {
     font-size: 18px;
     margin-bottom: 12px;
   }
-  
+
   .camera-options {
     gap: 10px;
     margin-bottom: 16px;
   }
-  
+
   .camera-option {
     padding: 16px 12px;
   }
-  
+
   .camera-option i {
     font-size: 32px;
     margin-bottom: 6px;
   }
-  
+
   .camera-option h3 {
     font-size: 15px;
     margin-bottom: 3px;
   }
-  
+
   .camera-option p {
     font-size: 11px;
     line-height: 1.3;
   }
-  
+
   nav {
     padding: 0 12px;
   }
-  
+
   nav .flex {
     padding: 8px 0;
   }
-  
+
   nav a {
     font-size: 14px;
   }
-  
+
   .progress-steps {
     gap: 5px;
     display: none;
   }
-  
+
   .progress-step-circle {
     width: 30px;
     height: 30px;
     font-size: 14px;
   }
-  
+
   .progress-step-label {
     font-size: 10px;
   }
-  
+
   .joint-info-panel {
     top: 70px;
     right: 10px;

@@ -14,27 +14,27 @@ function nextStep(step) {
   if (!validateCurrentStep()) {
     return;
   }
-  
+
   // Save current step data
   saveStepData();
-  
+
   // Hide current step
   document.getElementById(`step${currentStep}`).classList.add('hidden');
   document.getElementById(`step${currentStep}`).classList.remove('active');
   document.getElementById(`progressStep${currentStep}`).classList.remove('active');
   document.getElementById(`progressStep${currentStep}`).classList.add('completed');
-  
+
   // Show next step
   currentStep = step;
   document.getElementById(`step${step}`).classList.remove('hidden');
   document.getElementById(`step${step}`).classList.add('active');
   document.getElementById(`progressStep${step}`).classList.add('active');
-  
+
   // If moving to review step, generate review content
   if (step === 4) {
     generateReviewContent();
   }
-  
+
   // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -42,19 +42,19 @@ function nextStep(step) {
 function prevStep(step) {
   // Save current step data
   saveStepData();
-  
+
   // Hide current step
   document.getElementById(`step${currentStep}`).classList.add('hidden');
   document.getElementById(`step${currentStep}`).classList.remove('active');
   document.getElementById(`progressStep${currentStep}`).classList.remove('active');
-  
+
   // Show previous step
   currentStep = step;
   document.getElementById(`step${step}`).classList.remove('hidden');
   document.getElementById(`step${step}`).classList.add('active');
   document.getElementById(`progressStep${step}`).classList.add('active');
   document.getElementById(`progressStep${step}`).classList.remove('completed');
-  
+
   // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -66,16 +66,16 @@ function prevStep(step) {
 function validateCurrentStep() {
   const stepElement = document.getElementById(`step${currentStep}`);
   const requiredFields = stepElement.querySelectorAll('[required]');
-  
+
   let isValid = true;
   let firstInvalidField = null;
-  
+
   requiredFields.forEach(field => {
     if (field.type === 'radio') {
       // Check if at least one radio in the group is selected
       const radioGroup = document.getElementsByName(field.name);
       const isRadioChecked = Array.from(radioGroup).some(radio => radio.checked);
-      
+
       if (!isRadioChecked) {
         isValid = false;
         if (!firstInvalidField) {
@@ -99,7 +99,7 @@ function validateCurrentStep() {
       }
     }
   });
-  
+
   if (!isValid) {
     alert('Please fill in all required fields marked with *');
     if (firstInvalidField) {
@@ -107,7 +107,7 @@ function validateCurrentStep() {
     }
     return false;
   }
-  
+
   return true;
 }
 
@@ -118,7 +118,7 @@ function validateCurrentStep() {
 function saveStepData() {
   const stepElement = document.getElementById(`step${currentStep}`);
   const inputs = stepElement.querySelectorAll('input, select, textarea');
-  
+
   inputs.forEach(input => {
     if (input.type === 'radio') {
       if (input.checked) {
@@ -130,7 +130,7 @@ function saveStepData() {
       formData[input.name] = input.value;
     }
   });
-  
+
   console.log('💾 Saved step data:', formData);
 }
 
@@ -140,7 +140,7 @@ function saveStepData() {
 
 function generateReviewContent() {
   const reviewContent = document.getElementById('reviewContent');
-  
+
   const assessmentReasonLabels = {
     'pre_surgery': 'Pre-Surgery Assessment',
     'post_surgery': 'Post-Surgery Recovery',
@@ -148,7 +148,7 @@ function generateReviewContent() {
     'athletic_performance': 'Athletic Performance',
     'general_wellness': 'General Wellness'
   };
-  
+
   const activityLevelLabels = {
     'sedentary': 'Sedentary',
     'light': 'Light Activity',
@@ -156,7 +156,7 @@ function generateReviewContent() {
     'active': 'Active',
     'very_active': 'Very Active'
   };
-  
+
   reviewContent.innerHTML = `
     <!-- Personal Information -->
     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
@@ -242,46 +242,46 @@ function generateReviewContent() {
 
 document.getElementById('intakeForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const submitBtn = document.getElementById('submitBtn');
   const originalText = submitBtn.innerHTML;
-  
+
   try {
     // Disable button and show loading
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Patient...';
-    
+
     // Save final step data
     saveStepData();
-    
+
     console.log('📤 Submitting patient data:', formData);
-    
+
     // Submit to API
     const response = await axios.post('/api/patients', formData);
-    
+
     if (response.data.success) {
       createdPatientId = response.data.data.id;
       console.log('✅ Patient created with ID:', createdPatientId);
-      
+
       // Hide form
       document.getElementById('intakeForm').style.display = 'none';
-      
+
       // Show success message
       const successMessage = document.getElementById('successMessage');
       document.getElementById('patientName').textContent = `${formData.first_name} ${formData.last_name}`;
       successMessage.classList.remove('hidden');
-      
+
       // Scroll to success message
       successMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      
+
     } else {
       throw new Error(response.data.error || 'Failed to create patient');
     }
-    
+
   } catch (error) {
     console.error('❌ Error creating patient:', error);
     alert('Error creating patient: ' + (error.response?.data?.error || error.message));
-    
+
     // Re-enable button
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalText;
@@ -301,22 +301,44 @@ function startAssessment() {
 }
 
 // ============================================================================
+// TRANSCRIPTION HANDLER
+// ============================================================================
+
+function toggleTranscription(targetId) {
+  const btn = document.getElementById('transcribeBtn');
+  const btnText = document.getElementById('transcribeBtnText');
+  const service = window.PhysioMotion.TranscriptionService;
+
+  if (service.isTranscribing) {
+    service.stop();
+    btn.classList.remove('bg-red-100', 'text-red-700');
+    btn.classList.add('bg-gray-100', 'text-gray-700');
+    btnText.textContent = 'Transcribe Session';
+  } else {
+    service.start(targetId);
+    btn.classList.remove('bg-gray-100', 'text-gray-700');
+    btn.classList.add('bg-red-100', 'text-red-700');
+    btnText.textContent = 'Stop Transcribing';
+  }
+}
+
+// ============================================================================
 // ASSESSMENT CARD SELECTION STYLING
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   // Add click handlers for assessment cards
   const assessmentCards = document.querySelectorAll('.assessment-card');
-  
+
   assessmentCards.forEach(card => {
     card.addEventListener('click', () => {
       // Remove selected class from all cards
       assessmentCards.forEach(c => c.classList.remove('selected-card'));
-      
+
       // Add selected class to clicked card
       card.classList.add('selected-card');
     });
   });
-  
+
   console.log('✅ Intake workflow initialized');
 });

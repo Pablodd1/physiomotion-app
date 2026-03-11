@@ -11,7 +11,7 @@ PhysioMotion is a complete medical-grade platform that combines professional mot
 ### **Latest Updates** (October 2025)
 - ✅ **Fixed Database Schema**: Added missing `test_status` column to resolve D1_ERROR
 - ✅ **Complete Assessment Workflow**: Automatic patient selection and test creation
-- ✅ **Enhanced Camera Support**: 
+- ✅ **Enhanced Camera Support**:
   - Mobile: Front/back camera switching with facingMode API
   - Laptop: Built-in webcam with multi-camera detection
   - External: Automatic detection and enumeration of USB cameras
@@ -91,7 +91,7 @@ PhysioMotion is a complete medical-grade platform that combines professional mot
   - 32-joint skeleton tracking
   - PoE connectivity for synchronized multi-camera setups
   - Integration via Python/Node.js SDK wrappers
-  
+
 - **MediaPipe Pose** - Home exercise monitoring
   - Browser-based real-time pose estimation
   - 33-point landmark detection
@@ -110,21 +110,22 @@ PhysioMotion is a complete medical-grade platform that combines professional mot
 ## 📁 Project Structure
 
 ```
-IMW-MSK-Assesment/
-├── api/                # Vercel Serverless Entry Point (NEW)
-├── docs/               # System & Clinical Documentation (CLEANED)
-├── sql/                # Database Scripts & Seed Data (CLEANED)
-├── scripts/            # Build & Maintenance Utility Scripts (CLEANED)
-├── src/                # Main Hono Application Code
-│   ├── index.tsx       # API Routes & SSR Logic
-│   ├── types.ts        # TypeScript Type Definitions
-│   └── utils/          # AI & Biomechanical Utilities
-├── public/             # Static Assets & Metadata
-├── migrations/         # D1 Schema Migrations
-├── femto_bridge/       # Professional Camera Bridge Source
-├── vercel.json         # Vercel Deployment Configuration (NEW)
-├── package.json        # Project Manifest & Build Scripts
-└── README.md           # Primary Documentation
+webapp/
+├── src/
+│   ├── index.tsx               # Main Hono application & API routes
+│   ├── types.ts                # TypeScript type definitions
+│   └── utils/
+│       └── biomechanics.ts     # Biomechanical analysis algorithms
+├── public/
+│   └── static/
+│       └── app.js              # Frontend application logic
+├── migrations/
+│   └── 0001_initial_schema.sql # Complete database schema
+├── seed.sql                    # Exercise library & CPT codes seed data
+├── ecosystem.config.cjs        # PM2 process manager configuration
+├── wrangler.jsonc              # Cloudflare configuration
+├── package.json                # Dependencies and scripts
+└── README.md                   # This file
 ```
 
 ---
@@ -340,7 +341,7 @@ POST   /api/billing/events                    # Create billable event
 ### **Movement Quality Scoring**
 - 100 points baseline
 - Deduct 10 points per limited ROM joint
-- Deduct 8 points per significant asymmetry  
+- Deduct 8 points per significant asymmetry
 - Deduct 7 points per compensation pattern
 - **Final Score**: 0-100 (>80 = Good, 60-80 = Fair, <60 = Poor)
 
@@ -350,7 +351,7 @@ POST   /api/billing/events                    # Create billable event
 
 ### **Mobility Exercises**
 - Deep Squat
-- Overhead Squat  
+- Overhead Squat
 - Hip Flexor Stretch
 - Shoulder Flexion
 - Thoracic Rotation
@@ -560,7 +561,7 @@ Use the MediaPipe Pose integration in the frontend to:
 
 ### **Recommended Authentication**
 - Auth0
-- Clerk  
+- Clerk
 - Firebase Auth
 - Cloudflare Access
 
@@ -747,6 +748,6 @@ This project is built for medical use and should comply with all relevant health
 
 ---
 
-**Last Updated**: October 18, 2025  
-**Version**: 1.0.0  
+**Last Updated**: October 18, 2025
+**Version**: 1.0.0
 **Status**: ✅ Production Ready

@@ -118,7 +118,6 @@ logs/
 
 # Wrangler
 .wrangler/
-worker-configuration.d.ts
 
 # Vite
 .vite/
@@ -142,10 +141,6 @@ workerd
 # Cloudflare Workers specific
 worker/
 *.worker.js
-
-# Python
-__pycache__/
-*.pyc
 
 # macOS
 .DS_Store
