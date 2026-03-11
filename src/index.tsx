@@ -318,13 +318,21 @@ app.post('/api/patients',
     height_cm, weight_kg, insurance_provider, created_by_clinician_id
   ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-        validatedData.first_name, validatedData.last_name, validatedData.date_of_birth,
-        validatedData.gender, validatedData.email, validatedData.phone,
-        validatedData.emergency_contact_name, validatedData.emergency_contact_phone,
-        validatedData.address_line1, validatedData.city, validatedData.state, validatedData.zip_code,
-        validatedData.height_cm, validatedData.weight_kg, validatedData.insurance_provider,
-        clinician.id
-      ).run()
+      patient.first_name, patient.last_name, patient.date_of_birth,
+      patient.gender, patient.email, patient.phone,
+      patient.emergency_contact_name || null, patient.emergency_contact_phone || null,
+      patient.address_line1 || null, patient.city || null, patient.state || null, patient.zip_code || null,
+      patient.height_cm || null, patient.weight_kg || null, patient.insurance_provider || null
+    ).run()
+    
+    return c.json({
+      success: true,
+      data: { id: result.meta.last_row_id, ...patient }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
 
       safeLog.info('Patient created', { patientId: result.meta.last_row_id, createdBy: clinician.id })
 
