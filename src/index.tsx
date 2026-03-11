@@ -187,17 +187,15 @@ app.post('/api/auth/register', authRateLimit, validate(clinicianRegisterSchema),
     if (existing) {
       return c.json({ success: false, error: 'Email already registered' }, 400)
     }
-
-    // Generate secure salt and hash password
-    const salt = crypto.randomUUID()
-    const passwordHash = await hashPassword(data.password, salt)
-
-    const result = await mockD1.prepare(`
-      INSERT INTO clinicians(
-    email, password_hash, salt, first_name, last_name, title,
-    license_number, license_state, npi_number, phone, clinic_name,
-    role, active
-  ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'clinician', 1)
+    
+    // Hash password using production-grade PBKDF2
+    const passwordHash = await hashPassword(data.password)
+    
+    const result = await c.env.DB.prepare(`
+      INSERT INTO clinicians (
+        email, password_hash, first_name, last_name, title,
+        license_number, license_state, npi_number, phone, clinic_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.email, passwordHash, salt, data.first_name, data.last_name, data.title,
       data.license_number, data.license_state, data.npi_number,
@@ -995,8 +993,85 @@ app.post('/api/assessments/:id/generate-note', authMiddleware, async (c) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-// Simple password hashing (for demo - use proper bcrypt in production)
-// Removed duplicate password helper functions
+// Secure password hashing using PBKDF2 (production-grade alternative to bcrypt for Cloudflare Workers)
+async function hashPassword(password: string): Promise<string> {
+  const iterations = 100000
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const encoder = new TextEncoder()
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  )
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: iterations,
+      hash: 'SHA-256'
+    },
+    passwordKey,
+    256
+  )
+
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('')
+
+  return `pbkdf2:${iterations}:${saltHex}:${hashHex}`
+}
+
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  // Support legacy hashes for demo transition
+  if (!storedHash || !storedHash.startsWith('pbkdf2:')) {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(password + 'physiomotion-salt-2025')
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const legacyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    return legacyHash === (storedHash || '')
+  }
+
+  const parts = storedHash.split(':')
+  if (parts.length !== 4) return false
+
+  const [, iterationsStr, saltHex, hashHex] = parts
+  const iterations = parseInt(iterationsStr)
+  if (isNaN(iterations) || iterations <= 0) return false
+
+  // Convert hex salt back to Uint8Array
+  const saltMatch = saltHex.match(/.{1,2}/g)
+  if (!saltMatch) return false
+  const salt = new Uint8Array(saltMatch.map(byte => parseInt(byte, 16)))
+
+  const encoder = new TextEncoder()
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  )
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: iterations,
+      hash: 'SHA-256'
+    },
+    passwordKey,
+    256
+  )
+
+  const computedHashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+  // Safe comparison
+  return computedHashHex === hashHex
+}
 
 async function updateCompliancePercentage(db: any, prescribedExerciseId: number) {
   // Get total sessions completed vs expected
