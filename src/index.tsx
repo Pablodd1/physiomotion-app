@@ -505,11 +505,11 @@ app.post('/api/exercise-sessions', async (c) => {
     ).run()
     
     // Update compliance tracking (non-blocking)
-    const complianceUpdate = updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id)
-      .catch(err => console.error('Failed to update compliance:', err))
-
-    if (c.executionCtx) {
-      c.executionCtx.waitUntil(complianceUpdate)
+    const executionCtx = c.executionCtx
+    if (executionCtx && executionCtx.waitUntil) {
+      executionCtx.waitUntil(updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id))
+    } else {
+      updateCompliancePercentage(c.env.DB, session.prescribed_exercise_id).catch(console.error)
     }
     
     return c.json({ success: true, data: { id: result.meta.last_row_id } })
@@ -680,13 +680,15 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     `).bind(assessmentId).first()) as any
     
     // Get all movement tests and analyses
-    const { results: tests } = (await c.env.DB.prepare(`
+    const { results } = await c.env.DB.prepare(`
       SELECT mt.*, ma.*
       FROM movement_tests mt
       LEFT JOIN movement_analysis ma ON mt.id = ma.test_id
       WHERE mt.assessment_id = ?
     `).bind(assessmentId).all()) as any
     
+    const tests = results as any[]
+
     // Generate comprehensive medical note
     const medicalNote = generateMedicalNote(assessment, tests)
     
@@ -694,10 +696,13 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     let aiInsights = ""
     if (tests.length > 0 && typeof tests[0].deficiencies === 'string') {
         try {
-            const defs = JSON.parse(String(tests[0].deficiencies))
-            if (defs.length > 0) {
-                const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
-                aiInsights = ragResult.answer
+            const raw = tests[0].deficiencies as unknown
+            if (typeof raw === 'string') {
+              const defs = JSON.parse(raw)
+              if (defs.length > 0) {
+                  const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
+                  aiInsights = ragResult.answer
+              }
             }
         } catch (e) {}
     }
