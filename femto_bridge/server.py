@@ -107,6 +107,62 @@ class FemtoBridgeServer:
         if self.simulation:
             return self.generate_simulated_skeleton()
         
+        loop = asyncio.get_event_loop()
+
+        if self.use_k4a:
+            try:
+                # Run blocking capture in executor
+                capture = await loop.run_in_executor(None, self._wait_for_frames_blocking)
+
+                # Update tracker (run in executor to avoid blocking)
+                body_frame = await loop.run_in_executor(None, self.tracker.update, capture)
+
+                if body_frame.num_bodies == 0:
+                    return None
+
+                # Get the first body
+                body = body_frame.bodies[0]
+
+                # Map joints to expected format
+                joints = {}
+                joint_names = [
+                    'PELVIS', 'SPINE_NAVAL', 'SPINE_CHEST', 'NECK', 'CLAVICLE_LEFT',
+                    'SHOULDER_LEFT', 'ELBOW_LEFT', 'WRIST_LEFT', 'HAND_LEFT', 'HANDTIP_LEFT',
+                    'THUMB_LEFT', 'CLAVICLE_RIGHT', 'SHOULDER_RIGHT', 'ELBOW_RIGHT', 'WRIST_RIGHT',
+                    'HAND_RIGHT', 'HANDTIP_RIGHT', 'THUMB_RIGHT', 'HIP_LEFT', 'KNEE_LEFT',
+                    'ANKLE_LEFT', 'FOOT_LEFT', 'HIP_RIGHT', 'KNEE_RIGHT', 'ANKLE_RIGHT',
+                    'FOOT_RIGHT', 'HEAD', 'NOSE', 'EYE_LEFT', 'EAR_LEFT', 'EYE_RIGHT', 'EAR_RIGHT'
+                ]
+
+                for i, name in enumerate(joint_names):
+                    joint = body.joints[i]
+                    joints[name] = {
+                        'position': {
+                            'x': float(joint.position.x),
+                            'y': float(joint.position.y),
+                            'z': float(joint.position.z)
+                        },
+                        'orientation': {
+                            'w': float(joint.orientation.w),
+                            'x': float(joint.orientation.x),
+                            'y': float(joint.orientation.y),
+                            'z': float(joint.orientation.z)
+                        },
+                        'confidence': joint.confidence_level
+                    }
+
+                return {
+                    'timestamp': datetime.now().isoformat(),
+                    'body_id': int(body.id),
+                    'joints': joints,
+                    'simulation': False
+                }
+
+            except Exception as e:
+                logger.error(f"❌ Error capturing K4A frames: {e}")
+                return None
+
+        # Orbbec SDK fallback (no body tracking yet)
         try:
             # Get frames from camera
             loop = asyncio.get_event_loop()
