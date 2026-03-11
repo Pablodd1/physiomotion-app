@@ -708,8 +708,8 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     if (tests.length > 0 && tests[0].deficiencies && typeof tests[0].deficiencies === 'string') {
         try {
             const defs = JSON.parse(tests[0].deficiencies)
-            if (Array.isArray(defs) && defs.length > 0) {
-                const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
+            if (defs.length > 0) {
+                const ragResult = await queryExerciseKnowledge(c.env.DB, String(defs[0].area))
                 aiInsights = ragResult.answer
             }
         }

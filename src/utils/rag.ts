@@ -23,34 +23,21 @@ export async function queryExerciseKnowledge(db: any, query: string): Promise<RA
     };
   }
 
-  // Search exercises table using optimized SQL LIKE query
+  // Search exercises table for keywords
   let matches: any[] = [];
   try {
-    // Optimize: Use SQL LIKE for filtering instead of fetching all rows
-    // Construct dynamic query for keywords
-    const conditions = keywords.map(() =>
-      `(LOWER(name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(instructions) LIKE ?)`
-    );
+    // Construct dynamic query with parameterized LIKE clauses
+    // Use LOWER() for case-insensitive matching to match original behavior
+    const conditions = keywords.map(() => `(LOWER(name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(instructions) LIKE ?)`).join(' OR ');
+    const params = keywords.flatMap(k => [`%${k}%`, `%${k}%`, `%${k}%`]);
 
-    const sql = `SELECT * FROM exercises WHERE ${conditions.join(' OR ')} LIMIT 20`;
-
-    // Create parameters array (3 params per keyword)
-    const params: string[] = [];
-    keywords.forEach(k => {
-      const pattern = `%${k}%`;
-      params.push(pattern, pattern, pattern);
-    });
-
-    // Ensure we don't execute invalid SQL if logic changes
-    if (conditions.length > 0) {
-        const { results } = await db.prepare(sql).bind(...params).all();
-        exercises = results;
-    }
+    const { results } = await db.prepare(`
+      SELECT * FROM exercises WHERE ${conditions} LIMIT 20
+    `).bind(...params).all();
+    matches = results;
   } catch (e) {
     console.error('RAG Database error:', e);
   }
-
-  const matches = exercises;
 
   if (matches.length === 0) {
     return {
