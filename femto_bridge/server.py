@@ -198,21 +198,18 @@ class FemtoBridgeServer:
                         'skeleton': skeleton
                     })
                     
-                    # Send to all clients
+                    # Send to all clients using concurrent broadcasting
                     if self.clients:
-                        disconnected = set()
-                        active_clients = list(self.clients)
-                        results = await asyncio.gather(
-                            *[client.send(message) for client in active_clients],
-                            return_exceptions=True
-                        )
+                        clients_list = list(self.clients)
+                        tasks = [client.send(message) for client in clients_list]
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                        for client, result in zip(active_clients, results):
-                            if isinstance(result, Exception):
-                                if isinstance(result, websockets.exceptions.ConnectionClosed):
-                                    disconnected.add(client)
-                                else:
-                                    logger.error(f"❌ Error sending to client: {result}")
+                        disconnected = set()
+                        for client, result in zip(clients_list, results):
+                            if isinstance(result, websockets.exceptions.ConnectionClosed):
+                                disconnected.add(client)
+                            elif isinstance(result, Exception):
+                                logger.error(f"❌ Error sending to client: {result}")
 
                         # Remove disconnected clients
                         self.clients -= disconnected

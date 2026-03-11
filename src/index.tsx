@@ -687,18 +687,14 @@ app.post('/api/assessments/:id/generate-note', async (c) => {
     
     // Try to enhance with AI insights if deficiencies exist
     let aiInsights = ""
-    if (tests.length > 0) {
-        // Cast to any to avoid type inference issues
-        const firstTest = tests[0] as any
-        if (firstTest && firstTest.deficiencies) {
-            try {
-                const defs = JSON.parse(String(firstTest.deficiencies)) as any[]
-                if (Array.isArray(defs) && defs.length > 0 && defs[0].area) {
-                    const ragResult = await queryExerciseKnowledge(c.env.DB, String(defs[0].area))
-                    aiInsights = ragResult.answer
-                }
-            } catch (e) {}
-        }
+    if (tests.length > 0 && typeof tests[0].deficiencies === 'string') {
+        try {
+            const defs = JSON.parse(tests[0].deficiencies)
+            if (defs.length > 0) {
+                const ragResult = await queryExerciseKnowledge(c.env.DB, defs[0].area)
+                aiInsights = ragResult.answer
+            }
+        } catch (e) {}
     }
 
     // Generate comprehensive medical note
