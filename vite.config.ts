@@ -13,16 +13,7 @@ export default defineConfig({
   ],
   build: {
     target: 'esnext',
-    minify: 'terser',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'three': ['three'],
-          'tensorflow': ['@tensorflow/tfjs'],
-          'mediapipe': ['@mediapipe/pose']
-        }
-      }
-    }
+    minify: 'terser'
   },
   optimizeDeps: {
     include: ['three', 'zod', 'bcryptjs']

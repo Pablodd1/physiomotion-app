@@ -306,6 +306,15 @@ export const clinicianRegisterSchema = z.object({
     .or(z.literal(''))
 })
 
+export const loginSchema = z.object({
+  email: z.string()
+    .email('Invalid email format')
+    .max(255),
+  
+  password: z.string()
+    .min(1, 'Password is required')
+})
+
 // Medical History Schema
 export const medicalHistorySchema = z.object({
   surgery_type: z.enum(['pre_surgery', 'post_surgery', 'none', 'athletic_performance'])

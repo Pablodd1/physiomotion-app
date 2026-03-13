@@ -52,14 +52,6 @@ function calculateDistance(a: PoseLandmark, b: PoseLandmark): number {
 }
 
 /**
- * Calculate all joint angles from skeleton data
- */
-export function calculateJointAngles(skeleton: SkeletonData): Record<string, JointAngle> {
-  const { landmarks } = skeleton;
-
-  const jointAngles: Record<string, JointAngle> = {};
-
-/**
  * Calculate all joint angles from skeleton data - Optimized with pre-computed mappings
  */
 export function calculateJointAngles(skeleton: SkeletonData): Record<string, JointAngle> {
@@ -95,40 +87,6 @@ export function calculateJointAngles(skeleton: SkeletonData): Record<string, Joi
 
   // ... (Keep existing bilateral difference logic)
 
-
-  // Ankle Dorsiflexion (Left)
-  try {
-    const leftAnkleAngle = calculateAngle(
-      landmarks.left_knee,
-      landmarks.left_ankle,
-      landmarks.left_foot_index
-    );
-    jointAngles.left_ankle_dorsiflexion = {
-      joint_name: 'Left Ankle Dorsiflexion',
-      left_angle: leftAnkleAngle,
-      normal_range: [70, 110],
-      status: leftAnkleAngle >= 85 && leftAnkleAngle <= 105 ? 'normal' : 'limited'
-    };
-  } catch (e) {
-    console.error('Error calculating left ankle angle:', e);
-  }
-
-  // Ankle Dorsiflexion (Right)
-  try {
-    const rightAnkleAngle = calculateAngle(
-      landmarks.right_knee,
-      landmarks.right_ankle,
-      landmarks.right_foot_index
-    );
-    jointAngles.right_ankle_dorsiflexion = {
-      joint_name: 'Right Ankle Dorsiflexion',
-      right_angle: rightAnkleAngle,
-      normal_range: [70, 110],
-      status: rightAnkleAngle >= 85 && rightAnkleAngle <= 105 ? 'normal' : 'limited'
-    };
-  } catch (e) {
-    console.error('Error calculating right ankle angle:', e);
-  }
 
   // Calculate bilateral differences
   for (const key in jointAngles) {

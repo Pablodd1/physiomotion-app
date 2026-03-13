@@ -1,4 +1,4 @@
-import { mockD1 } from '../db';
+import { mockD1 } from '../utils/db-helpers';
 // Security Middleware - Authentication & Authorization
 // Medical-Grade Implementation
 
