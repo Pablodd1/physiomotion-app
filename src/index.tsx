@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { serveStatic } from 'hono/cloudflare-workers'
+import { serveStatic } from '@hono/node-server/serve-static'
 import type { Bindings } from './types'
 import { performBiomechanicalAnalysis } from './utils/biomechanics'
 import { queryExerciseKnowledge } from './utils/rag'
@@ -31,8 +31,6 @@ const corsOptions = {
 
 app.use('/api/*', cors(corsOptions))
 
-app.use('/static/*', serveStatic({ root: './public', manifest: {} }))
-
 // Security headers
 app.use('*', async (c, next) => {
   await next()
@@ -41,6 +39,7 @@ app.use('*', async (c, next) => {
   c.res.headers.set('X-XSS-Protection', '1; mode=block')
 })
 
+// API Routes
 app.route('/api/auth', authRoutes)
 app.route('/api/patients', patientRoutes)
 app.route('/api/assessments', assessmentRoutes)
@@ -92,19 +91,21 @@ app.get('/api/health', (c) => {
 // Camera/device detection API
 app.get('/api/cameras', async (c) => {
   try {
-    // This works in browser context via POST request
     return c.json({ 
       success: true, 
       data: {
         supported: ['webcam', 'femto-mega', 'azure-kinect', 'orbbec'],
         note: 'Camera access requires frontend request'
-      } 
+      }
     })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
 })
 
-app.get('*', serveStatic({ root: './public', index: 'index.html' }))
+// Static files and SPA fallback (must be LAST)
+app.use('/assets/*', serveStatic({ root: './dist' }))
+app.use('/favicon.png', serveStatic({ path: './dist/favicon.png' }))
+app.use('*', serveStatic({ root: './dist', index: 'index.html' }))
 
 export default app
