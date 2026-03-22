@@ -66,8 +66,8 @@ app.post('/api/video/analyze', async (c) => {
 
 app.post('/api/analyze-movement', async (c) => {
   try {
-    const { skeletonData, testType } = await c.req.json()
-    const analysis = await performBiomechanicalAnalysis(skeletonData, testType)
+    const { skeletonData } = await c.req.json()
+    const analysis = await performBiomechanicalAnalysis(skeletonData)
     return c.json({ success: true, data: analysis })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
