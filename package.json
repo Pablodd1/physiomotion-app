@@ -5,7 +5,8 @@
     "dev": "vite --port 3000 --host",
     "build": "vite build",
     "preview": "vite preview --port 3000 --host",
-    "railway": "node server.ts",
+    "railway": "tsx server.ts",
+    "start": "tsx server.ts",
     "deploy:railway": "git push railway main",
     "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
     "test": "curl http://localhost:3000",
@@ -14,6 +15,7 @@
   "dependencies": {
     "hono": "^4.10.1",
     "@hono/node-server": "^1.13.8",
+    "tsx": "^4.19.0",
     "bcryptjs": "^2.4.3",
     "zod": "^3.23.0",
     "three": "^0.160.0",
