@@ -14,6 +14,8 @@ import { errorHandler } from './middleware/error'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+console.log('[INIT] Starting PhysioMotion API server...')
+
 // Global Error Handler
 app.use('*', errorHandler)
 
@@ -40,11 +42,27 @@ app.use('*', async (c, next) => {
 })
 
 // API Routes
+console.log('[INIT] Mounting routes...')
 app.route('/api/auth', authRoutes)
+console.log('[INIT] Mounted /api/auth')
 app.route('/api/patients', patientRoutes)
+console.log('[INIT] Mounted /api/patients')
 app.route('/api/assessments', assessmentRoutes)
+console.log('[INIT] Mounted /api/assessments')
 app.route('/api', exerciseRoutes)
+console.log('[INIT] Mounted /api (exercises)')
 app.route('/api/billing', billingRoutes)
+console.log('[INIT] Mounted /api/billing')
+
+// Debug endpoint
+app.get('/api/debug', (c) => {
+  const routes = app.routes.map(r => `${r.method} ${r.path}`)
+  return c.json({ 
+    status: 'debug', 
+    totalRoutes: routes.length,
+    routes: routes.slice(0, 50)
+  })
+})
 
 // Real-time joint tracking API
 app.post('/api/video/analyze', async (c) => {
@@ -85,32 +103,10 @@ app.post('/api/rag/query', async (c) => {
 })
 
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+  return c.json({ status: 'ok', timestamp: new Date().toISOString(), app: 'PhysioMotion' })
 })
 
-// Debug endpoint - list all routes
-app.get('/api/debug/routes', (c) => {
-  const routes = [
-    'GET /api/health',
-    'GET /api/debug/routes',
-    'GET /api/cameras',
-    'GET /api/patients',
-    'GET /api/patients/:id',
-    'POST /api/patients',
-    'PUT /api/patients/:id',
-    'DELETE /api/patients/:id',
-    'POST /api/auth/login',
-    'POST /api/auth/register',
-    'GET /api/auth/profile/:id',
-    'GET /api/assessments',
-    'GET /api/assessments/:id',
-    'POST /api/assessments',
-    'POST /api/video/analyze',
-    'POST /api/analyze-movement',
-    'POST /api/rag/query'
-  ]
-  return c.json({ success: true, routes })
-})
+// Camera/device detection API
 app.get('/api/cameras', async (c) => {
   try {
     return c.json({ 
@@ -129,5 +125,7 @@ app.get('/api/cameras', async (c) => {
 app.use('/assets/*', serveStatic({ root: './dist' }))
 app.use('/favicon.png', serveStatic({ path: './dist/favicon.png' }))
 app.use('*', serveStatic({ root: './dist', index: 'index.html' }))
+
+console.log(`[INIT] Total routes registered: ${app.routes.length}`)
 
 export default app
