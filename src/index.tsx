@@ -88,7 +88,29 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Camera/device detection API
+// Debug endpoint - list all routes
+app.get('/api/debug/routes', (c) => {
+  const routes = [
+    'GET /api/health',
+    'GET /api/debug/routes',
+    'GET /api/cameras',
+    'GET /api/patients',
+    'GET /api/patients/:id',
+    'POST /api/patients',
+    'PUT /api/patients/:id',
+    'DELETE /api/patients/:id',
+    'POST /api/auth/login',
+    'POST /api/auth/register',
+    'GET /api/auth/profile/:id',
+    'GET /api/assessments',
+    'GET /api/assessments/:id',
+    'POST /api/assessments',
+    'POST /api/video/analyze',
+    'POST /api/analyze-movement',
+    'POST /api/rag/query'
+  ]
+  return c.json({ success: true, routes })
+})
 app.get('/api/cameras', async (c) => {
   try {
     return c.json({ 
