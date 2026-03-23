@@ -2,10 +2,24 @@
 
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 
+// Database adapter interface that works with both D1 and PostgreSQL
+export interface DatabaseAdapter {
+  prepare: (query: string) => {
+    bind: (...args: any[]) => {
+      first: <T = any>() => Promise<T | null>;
+      all: <T = any>() => Promise<{ results: T[]; success: boolean; meta: { last_row_id: number | null } }>;
+      run: () => Promise<{ success: boolean; meta: { last_row_id: number | null } }>;
+    };
+    first: <T = any>() => Promise<T | null>;
+    all: <T = any>() => Promise<{ results: T[]; success: boolean; meta: { last_row_id: number | null } }>;
+    run: () => Promise<{ success: boolean; meta: { last_row_id: number | null } }>;
+  };
+}
+
 export type Bindings = {
-  DB: D1Database;
-  R2: R2Bucket;
-  KV: KVNamespace;
+  DB: D1Database | DatabaseAdapter;
+  R2?: R2Bucket;
+  KV?: KVNamespace;
 }
 
 // ============================================================================
