@@ -217,11 +217,12 @@ export const sessionTimeout = createMiddleware<{ Bindings: Bindings, Variables: 
 
   if (clinician?.id) {
     // Check last activity
-    const lastActivity = await mockD1.prepare(`
+    const lastActivityRow = await mockD1.prepare(`
       SELECT last_activity FROM clinicians WHERE id = ?
-    `).bind(clinician.id).first<{ last_activity: string }>()
+    `).bind(clinician.id).first()
 
-    if (lastActivity?.last_activity) {
+    if (lastActivityRow && 'last_activity' in lastActivityRow) {
+      const lastActivity = lastActivityRow as { last_activity: string }
       const lastActiveTime = new Date(lastActivity.last_activity).getTime()
       const now = Date.now()
 

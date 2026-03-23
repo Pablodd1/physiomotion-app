@@ -58,6 +58,10 @@ exercises.post('/prescriptions', authMiddleware, validate(prescriptionSchema), a
     const prescription = c.get('validatedData')
     const clinician = c.get('clinician')
 
+    if (!prescription) {
+      return c.json({ success: false, error: 'Invalid prescription data' }, 400)
+    }
+
     const result = await c.env.DB.prepare(`
       INSERT INTO prescribed_exercises (
         patient_id, exercise_id, assessment_id, sets, repetitions,

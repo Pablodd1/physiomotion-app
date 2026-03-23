@@ -1,5 +1,4 @@
-import { createD1Adapter } from './db'
-import type { Bindings } from './types'
+import type { Bindings } from '../types'
 
 // Global mockD1 for Cloudflare context
 export const mockD1 = {

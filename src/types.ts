@@ -446,7 +446,14 @@ export interface JointAngle {
   bilateral_difference?: number;
   normal_range: [number, number]; // [min, max]
   status: 'normal' | 'limited' | 'excessive';
+  confidence?: number;
+  method?: string;
+  deviationFromNorm?: number;
+  clinicalSignificance?: string;
 }
+
+// Alias for backwards compatibility
+export type ClinicalJointAngle = JointAngle;
 
 export interface BiomechanicalAnalysis {
   joint_angles: JointAngle[];
@@ -459,6 +466,22 @@ export interface BiomechanicalAnalysis {
     description: string;
     recommended_exercises: number[]; // exercise_ids
   }>;
+}
+
+// ============================================================================
+// HONO CONTEXT TYPES
+// ============================================================================
+
+export type Variables = {
+  clinician?: {
+    id: number;
+    email: string;
+    role: string;
+    clinic_id?: number;
+  };
+  clinicianId?: number;
+  validatedData?: any;
+  validatedId?: number;
 }
 
 // ============================================================================

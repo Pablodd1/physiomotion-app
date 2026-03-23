@@ -1,7 +1,7 @@
 // Real-Time Medical Notes Generator
 // Generates SOAP notes from live movement tracking data
 
-import type { BiomechanicalAnalysis, ClinicalJointAngle } from '../types';
+import type { BiomechanicalAnalysis, JointAngle, ClinicalJointAngle } from '../types';
 
 interface LiveTrackingSession {
   sessionId: string;
