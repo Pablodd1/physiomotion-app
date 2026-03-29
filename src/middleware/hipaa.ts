@@ -1,19 +1,21 @@
-import { mockD1 } from '../utils/db-helpers';
 // HIPAA Compliance Middleware
-// Audit Logging & Security
+// Audit Logging & PHI Protection
 
 import { createMiddleware } from 'hono/factory'
 import type { Bindings, Variables } from '../types'
+import { getPool } from '../database'
 
 // Audit Action Types
 export type AuditAction =
-  | 'LOGIN' | 'LOGOUT' | 'LOGIN_FAILED'
+  | 'LOGIN' | 'LOGOUT' | 'LOGIN_FAILED' | 'PASSWORD_CHANGED' | 'REGISTER' | 'REGISTER_FAILED'
+  | 'PROFILE_UPDATE'
   | 'PATIENT_VIEW' | 'PATIENT_CREATE' | 'PATIENT_UPDATE' | 'PATIENT_DELETE'
   | 'ASSESSMENT_VIEW' | 'ASSESSMENT_CREATE' | 'ASSESSMENT_UPDATE' | 'ASSESSMENT_COMPLETE'
   | 'TEST_VIEW' | 'TEST_CREATE' | 'TEST_ANALYZE'
   | 'PRESCRIPTION_VIEW' | 'PRESCRIPTION_CREATE' | 'PRESCRIPTION_UPDATE'
   | 'SESSION_VIEW' | 'SESSION_CREATE'
   | 'BILLING_VIEW' | 'BILLING_CREATE'
+  | 'VIDEO_VIEW' | 'VIDEO_UPLOAD' | 'VIDEO_DELETE'
   | 'REPORT_GENERATE' | 'EXPORT_DATA'
   | 'SETTINGS_CHANGE' | 'USER_CREATE' | 'USER_UPDATE' | 'USER_DELETE'
 
@@ -27,6 +29,7 @@ export type ResourceType =
   | 'prescription'
   | 'session'
   | 'billing'
+  | 'video'
   | 'clinician'
   | 'report'
 
@@ -35,7 +38,8 @@ const SENSITIVE_FIELDS = [
   'first_name', 'last_name', 'email', 'phone', 'date_of_birth',
   'ssn', 'social_security', 'address', 'insurance', 'policy_number',
   'medical_history', 'medications', 'allergies', 'diagnosis',
-  'prescription', 'notes', 'pain_location', 'emergency_contact'
+  'prescription', 'notes', 'pain_location', 'emergency_contact',
+  'password', 'password_hash', 'token'
 ]
 
 // Redact sensitive data for logging
@@ -71,105 +75,112 @@ function redactSensitiveData(data: any): any {
   return data
 }
 
-// Safe logging - prevents PHI in logs
-export const safeLog = {
+// HIPAA-compliant logger - no PHI in console logs
+export const hipaaLogger = {
   info: (message: string, meta?: Record<string, any>) => {
     const safeMeta = meta ? redactSensitiveData(meta) : undefined
-    console.log(`[INFO] ${new Date().toISOString()} - ${message}`, safeMeta || '')
+    // Only log in development, use audit database in production
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[INFO] ${new Date().toISOString()} - ${message}`, safeMeta || '')
+    }
   },
 
   warn: (message: string, meta?: Record<string, any>) => {
     const safeMeta = meta ? redactSensitiveData(meta) : undefined
-    console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, safeMeta || '')
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, safeMeta || '')
+    }
   },
 
   error: (message: string, error?: Error, meta?: Record<string, any>) => {
     const safeMeta = meta ? redactSensitiveData(meta) : undefined
-    console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, {
+    // Error logging without PHI
+    const errorInfo = {
       message: error?.message || message,
-      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+      // Never log stack traces with potential PHI
+      code: (error as any)?.code,
       ...safeMeta
-    })
+    }
+    console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, errorInfo)
   },
 
-  audit: (action: AuditAction, resourceType: ResourceType, details: Record<string, any>) => {
-    // Always redact for audit logs
-    const safeDetails = redactSensitiveData(details)
-    console.log(`[AUDIT] ${new Date().toISOString()} - ${action} on ${resourceType}`, safeDetails)
+  // Audit logging - goes to database, not console
+  audit: async (action: AuditAction, resourceType: ResourceType, details: Record<string, any>) => {
+    const pool = getPool()
+    if (!pool) return
+
+    try {
+      // Always redact for audit logs
+      const safeDetails = redactSensitiveData(details)
+      
+      await pool.query(
+        `INSERT INTO audit_logs (
+          user_id, user_email, action, resource_type, resource_id,
+          ip_address, user_agent, http_method, http_path, 
+          request_data, success, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+        [
+          safeDetails.userId || null,
+          safeDetails.userEmail || null,
+          action,
+          resourceType,
+          safeDetails.resourceId || null,
+          safeDetails.ipAddress || null,
+          safeDetails.userAgent || null,
+          safeDetails.httpMethod || null,
+          safeDetails.httpPath || null,
+          JSON.stringify(safeDetails),
+          safeDetails.success !== false
+        ]
+      )
+    } catch (e) {
+      // Silent fail - don't block operations due to audit logging failures
+      // But do log to console that audit logging failed (without PHI)
+      console.error('[AUDIT] Failed to write audit log:', { action, resourceType })
+    }
   }
 }
 
-// Audit Log Middleware
+// Audit Log Middleware - Records all PHI access to database
 export const auditLog = (action: AuditAction, resourceType: ResourceType) =>
   createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
     const startTime = Date.now()
     const clinician = c.get('clinician')
-    const clinicianId = clinician?.id || null
 
     // Get client info
-    const ipAddress = c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For') ||
+    const ipAddress = c.req.header('X-Forwarded-For') ||
+      c.req.header('CF-Connecting-IP') ||
+      c.req.header('X-Real-IP') ||
       'unknown'
     const userAgent = c.req.header('User-Agent') || 'unknown'
 
     // Get resource ID from params if available
-    const resourceId = c.req.param('id') || null
-
-    // Capture response
-    const originalResponse = c.res.clone()
+    const resourceId = c.req.param('id') || 
+                       c.req.param('patientId') || 
+                       c.req.param('patient_id') ||
+                       null
 
     await next()
 
     const duration = Date.now() - startTime
     const status = c.res.status
-
-    // Determine if action was successful
     const success = status >= 200 && status < 400
 
-    // Log to database
-    try {
-      await mockD1.prepare(`
-        INSERT INTO audit_logs (
-          clinician_id, 
-          action, 
-          resource_type, 
-          resource_id, 
-          ip_address, 
-          user_agent,
-          http_method,
-          http_status,
-          duration_ms,
-          success,
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `).bind(
-        clinicianId,
-        action,
-        resourceType,
-        resourceId,
-        ipAddress,
-        userAgent,
-        c.req.method,
-        status,
-        duration,
-        success ? 1 : 0
-      ).run()
-    } catch (error) {
-      // Log to console but don't fail the request
-      console.error('Failed to write audit log:', error)
-    }
-
-    // Also log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      safeLog.audit(action, resourceType, {
-        clinicianId,
-        resourceId,
-        ipAddress,
-        httpMethod: c.req.method,
-        status,
-        duration
-      })
-    }
+    // Log to database (async, don't await to avoid blocking)
+    hipaaLogger.audit(action, resourceType, {
+      userId: clinician?.id,
+      userEmail: clinician?.email,
+      resourceId,
+      ipAddress,
+      userAgent,
+      httpMethod: c.req.method,
+      httpPath: c.req.path,
+      status,
+      duration,
+      success
+    }).catch(() => {
+      // Silent fail
+    })
   })
 
 // PHI Access Audit - Extra logging for sensitive operations
@@ -192,19 +203,22 @@ export const phiAudit = (action: 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE', resour
       requestData.patient_id ||
       null
 
-    safeLog.audit(
+    // Log to database
+    hipaaLogger.audit(
       `PHI_${action}` as AuditAction,
       resourceType,
       {
-        clinicianId: clinician?.id,
-        clinicianEmail: clinician?.email,
+        userId: clinician?.id,
+        userEmail: clinician?.email,
         patientId,
         action,
         resourceType,
-        ipAddress: c.req.header('CF-Connecting-IP'),
+        ipAddress: c.req.header('X-Forwarded-For') || 'unknown',
+        httpPath: c.req.path,
+        httpMethod: c.req.method,
         timestamp: new Date().toISOString()
       }
-    )
+    ).catch(() => {})
 
     await next()
   })
@@ -213,26 +227,44 @@ export const phiAudit = (action: 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE', resour
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
 
 export const sessionTimeout = createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
+  const pool = getPool()
   const clinician = c.get('clinician')
 
-  if (clinician?.id) {
+  if (clinician?.id && pool) {
     // Check last activity
-    const lastActivityRow = await mockD1.prepare(`
-      SELECT last_activity FROM clinicians WHERE id = ?
-    `).bind(clinician.id).first()
+    const result = await pool.query(
+      'SELECT last_activity_at FROM users WHERE id = $1',
+      [clinician.id]
+    )
 
-    if (lastActivityRow && 'last_activity' in lastActivityRow) {
-      const lastActivity = lastActivityRow as { last_activity: string }
-      const lastActiveTime = new Date(lastActivity.last_activity).getTime()
-      const now = Date.now()
+    if (result.rows.length > 0) {
+      const lastActivity = result.rows[0].last_activity_at
+      if (lastActivity) {
+        const lastActiveTime = new Date(lastActivity).getTime()
+        const now = Date.now()
 
-      if (now - lastActiveTime > SESSION_TIMEOUT_MS) {
-        return c.json({
-          success: false,
-          error: 'Session expired due to inactivity',
-          code: 'SESSION_TIMEOUT'
-        }, 401)
+        if (now - lastActiveTime > SESSION_TIMEOUT_MS) {
+          // Log timeout
+          hipaaLogger.audit('LOGOUT', 'auth', {
+            userId: clinician.id,
+            userEmail: clinician.email,
+            reason: 'session_timeout',
+            success: true
+          }).catch(() => {})
+
+          return c.json({
+            success: false,
+            error: 'Session expired due to inactivity',
+            code: 'SESSION_TIMEOUT'
+          }, 401)
+        }
       }
+
+      // Update last activity
+      await pool.query(
+        'UPDATE users SET last_activity_at = NOW() WHERE id = $1',
+        [clinician.id]
+      ).catch(() => {})
     }
   }
 
@@ -240,7 +272,7 @@ export const sessionTimeout = createMiddleware<{ Bindings: Bindings, Variables: 
 })
 
 // Request Size Limit (prevent DoS)
-export const requestSizeLimit = (maxSize: number = 1024 * 1024) =>
+export const requestSizeLimit = (maxSize: number = 50 * 1024 * 1024) =>
   createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
     const contentLength = c.req.header('Content-Length')
 
@@ -263,7 +295,7 @@ export const securityHeaders = createMiddleware<{ Bindings: Bindings, Variables:
   c.res.headers.set('X-Frame-Options', 'DENY')
   c.res.headers.set('X-XSS-Protection', '1; mode=block')
   c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  c.res.headers.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()')
 
   // HSTS (only over HTTPS)
   if (c.req.url.startsWith('https://')) {
@@ -271,27 +303,35 @@ export const securityHeaders = createMiddleware<{ Bindings: Bindings, Variables:
   }
 })
 
-// Create audit logs table migration
-export const AUDIT_LOG_MIGRATION = `
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  clinician_id INTEGER,
-  action TEXT NOT NULL,
-  resource_type TEXT NOT NULL,
-  resource_id TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  http_method TEXT,
-  http_status INTEGER,
-  duration_ms INTEGER,
-  success INTEGER DEFAULT 1,
-  details TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (clinician_id) REFERENCES clinicians(id) ON DELETE SET NULL
-);
+// Auto-logout warning middleware
+export const autoLogoutWarning = createMiddleware<{ Bindings: Bindings, Variables: Variables }>(async (c, next) => {
+  await next()
 
-CREATE INDEX IF NOT EXISTS idx_audit_clinician ON audit_logs(clinician_id);
-CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
-CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
-`
+  const pool = getPool()
+  const clinician = c.get('clinician')
+
+  if (clinician?.id && pool) {
+    const result = await pool.query(
+      'SELECT last_activity_at FROM users WHERE id = $1',
+      [clinician.id]
+    )
+
+    if (result.rows.length > 0) {
+      const lastActivity = result.rows[0].last_activity_at
+      if (lastActivity) {
+        const lastActiveTime = new Date(lastActivity).getTime()
+        const now = Date.now()
+        const timeRemaining = SESSION_TIMEOUT_MS - (now - lastActiveTime)
+
+        // Add warning header if session expires in less than 60 seconds
+        if (timeRemaining < 60000 && timeRemaining > 0) {
+          c.res.headers.set('X-Session-Warning', 'true')
+          c.res.headers.set('X-Session-Time-Remaining', Math.floor(timeRemaining / 1000).toString())
+        }
+      }
+    }
+  }
+})
+
+// Export audit actions for use in routes
+export { SENSITIVE_FIELDS, redactSensitiveData }

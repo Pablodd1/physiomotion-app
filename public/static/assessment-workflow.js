@@ -837,38 +837,107 @@ function calculateAngle3D(a, b, c) {
 }
 
 // ============================================================================
-// RECORDING & ANALYSIS (RESTORED ROBUST API CALLS)
+// RECORDING & ANALYSIS (WITH VIDEO + SKELETON)
 // ============================================================================
 
-function startRecording() {
+async function startRecording() {
+  // Initialize video recorder if not already done
+  const videoElement = document.getElementById('videoElement');
+  
+  if (!VideoRecorder.mediaRecorder && videoElement && videoElement.srcObject) {
+    const initialized = await VideoRecorder.initialize(videoElement);
+    if (!initialized) {
+      console.warn('Video recording not available, continuing with skeleton only');
+    }
+  }
+  
+  // Start skeleton recording
   ASSESSMENT_STATE.isRecording = true;
   ASSESSMENT_STATE.recordingStartTime = Date.now();
   ASSESSMENT_STATE.skeletonFrames = [];
   
+  // Start video recording if available
+  let videoStarted = false;
+  if (VideoRecorder.mediaRecorder) {
+    videoStarted = VideoRecorder.startRecording();
+  }
+  
+  // Update UI
   document.getElementById('recordingIndicator').style.display = 'flex';
   document.getElementById('recordBtn').style.display = 'none';
   document.getElementById('stopBtn').style.display = 'flex';
   
-  const interval = setInterval(() => {
-    if (!ASSESSMENT_STATE.isRecording) {
-        clearInterval(interval);
+  // Update recording timer display (backup if VideoRecorder not available)
+  if (!VideoRecorder.isRecording) {
+    ASSESSMENT_STATE.recordingTimer = setInterval(() => {
+      if (!ASSESSMENT_STATE.isRecording) {
+        clearInterval(ASSESSMENT_STATE.recordingTimer);
         return;
-    }
-    const elapsed = Math.floor((Date.now() - ASSESSMENT_STATE.recordingStartTime) / 1000);
-    const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
-    const secs = (elapsed % 60).toString().padStart(2, '0');
-    document.getElementById('recordingTime').textContent = `${mins}:${secs}`;
-  }, 100);
-
-  showNotification('Recording started', 'success');
+      }
+      const elapsed = Math.floor((Date.now() - ASSESSMENT_STATE.recordingStartTime) / 1000);
+      const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+      const secs = (elapsed % 60).toString().padStart(2, '0');
+      const timerEl = document.getElementById('recordingTime');
+      if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+    }, 1000);
+  }
+  
+  const message = videoStarted 
+    ? 'Recording started (video + skeleton tracking)'
+    : 'Recording started (skeleton tracking only)';
+  showNotification(message, 'success');
 }
 
 function stopRecording() {
+  // Stop skeleton recording
   ASSESSMENT_STATE.isRecording = false;
+  
+  // Stop timer
+  if (ASSESSMENT_STATE.recordingTimer) {
+    clearInterval(ASSESSMENT_STATE.recordingTimer);
+    ASSESSMENT_STATE.recordingTimer = null;
+  }
+  
+  // Stop video recording
+  const videoStats = VideoRecorder.stopRecording();
+  
+  // Update UI
   document.getElementById('recordingIndicator').style.display = 'none';
   document.getElementById('stopBtn').style.display = 'none';
   document.getElementById('analyzeBtn').style.display = 'flex';
-  showNotification(`Captured ${ASSESSMENT_STATE.skeletonFrames.length} frames`, 'success');
+  
+  // Build status message
+  let message = `Captured ${ASSESSMENT_STATE.skeletonFrames.length} skeleton frames`;
+  if (videoStats) {
+    message += `, ${videoStats.duration}s video (${VideoRecorder.getStats().sizeFormatted})`;
+  }
+  showNotification(message, 'success');
+}
+
+// Upload the recorded video to server
+async function uploadAssessmentVideo() {
+  if (!ASSESSMENT_STATE.patientId) {
+    showNotification('No patient selected', 'error');
+    return null;
+  }
+  
+  const stats = VideoRecorder.getStats();
+  if (stats.size === 0) {
+    console.log('No video recorded (skeleton-only mode)');
+    return null;
+  }
+  
+  const result = await VideoRecorder.uploadVideo(
+    ASSESSMENT_STATE.patientId,
+    ASSESSMENT_STATE.assessmentId,
+    {
+      title: `Assessment - ${new Date().toLocaleString()}`,
+      description: `Movement assessment with ${ASSESSMENT_STATE.skeletonFrames.length} skeleton frames`,
+      videoType: 'assessment'
+    }
+  );
+  
+  return result;
 }
 
 async function analyzeMovement() {
@@ -878,6 +947,13 @@ async function analyzeMovement() {
   }
 
   showNotification('Analyzing movement...', 'info');
+  
+  // First, upload the video if available
+  let videoData = null;
+  if (VideoRecorder.getStats().size > 0) {
+    showNotification('Uploading video...', 'info');
+    videoData = await uploadAssessmentVideo();
+  }
 
   // Take middle frame as representative
   const middleIndex = Math.floor(ASSESSMENT_STATE.skeletonFrames.length / 2);
@@ -887,7 +963,10 @@ async function analyzeMovement() {
     const response = await fetch(`/api/tests/${ASSESSMENT_STATE.testId}/analyze`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skeleton_data: representativeSkeleton })
+      body: JSON.stringify({ 
+        skeleton_data: representativeSkeleton,
+        video_id: videoData?.id || null
+      })
     });
 
     const result = await response.json();
@@ -896,8 +975,12 @@ async function analyzeMovement() {
       updateProgress(4);
       document.getElementById('cameraContainer').style.display = 'none';
       document.getElementById('resultsContainer').style.display = 'block';
-      displayAnalysisResults(result.data); // Fixed: result.data usually contains analysis directly
-      showNotification('Analysis complete!', 'success');
+      displayAnalysisResults(result.data);
+      
+      const message = videoData 
+        ? 'Analysis complete! Video saved.' 
+        : 'Analysis complete!';
+      showNotification(message, 'success');
     } else {
       showNotification('Analysis failed: ' + result.error, 'error');
     }

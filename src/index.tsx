@@ -10,11 +10,25 @@ import patientRoutes from './routes/patients'
 import assessmentRoutes from './routes/assessments'
 import exerciseRoutes from './routes/exercises'
 import billingRoutes from './routes/billing'
+import videoRoutes from './routes/videos'
+import adminRoutes from './routes/admin'
+import portalRoutes from './routes/portal'
+import testRoutes from './routes/tests'
 import { errorHandler } from './middleware/error'
+import { getPool, testConnection } from './database'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
 console.log('[INIT] Starting PhysioMotion API server...')
+
+// Test database connection on startup
+testConnection().then(connected => {
+  if (connected) {
+    console.log('[INIT] Database connection established')
+  } else {
+    console.warn('[INIT] Database connection failed - running in limited mode')
+  }
+})
 
 // Global Error Handler
 app.use('*', errorHandler)
@@ -26,7 +40,7 @@ const corsOptions = {
     return isAllowed ? origin : null
   },
   credentials: true,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   maxAge: 86400,
 }
@@ -39,6 +53,8 @@ app.use('*', async (c, next) => {
   c.res.headers.set('X-Content-Type-Options', 'nosniff')
   c.res.headers.set('X-Frame-Options', 'DENY')
   c.res.headers.set('X-XSS-Protection', '1; mode=block')
+  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.res.headers.set('Permissions-Policy', 'camera=(self), microphone=(self)')
 })
 
 // API Routes
@@ -49,10 +65,18 @@ app.route('/api/patients', patientRoutes)
 console.log('[INIT] Mounted /api/patients')
 app.route('/api/assessments', assessmentRoutes)
 console.log('[INIT] Mounted /api/assessments')
+app.route('/api/tests', testRoutes)
+console.log('[INIT] Mounted /api/tests')
 app.route('/api', exerciseRoutes)
 console.log('[INIT] Mounted /api (exercises)')
 app.route('/api/billing', billingRoutes)
 console.log('[INIT] Mounted /api/billing')
+app.route('/api/videos', videoRoutes)
+console.log('[INIT] Mounted /api/videos')
+app.route('/api/admin', adminRoutes)
+console.log('[INIT] Mounted /api/admin')
+app.route('/api/portal', portalRoutes)
+console.log('[INIT] Mounted /api/portal')
 
 // Debug endpoint
 app.get('/api/debug', (c) => {
@@ -61,6 +85,30 @@ app.get('/api/debug', (c) => {
     status: 'debug', 
     totalRoutes: routes.length,
     routes: routes.slice(0, 50)
+  })
+})
+
+// Health check
+app.get('/api/health', async (c) => {
+  const pool = getPool()
+  let dbStatus = 'disconnected'
+  
+  if (pool) {
+    try {
+      await pool.query('SELECT 1')
+      dbStatus = 'connected'
+    } catch (e) {
+      dbStatus = 'error'
+    }
+  }
+
+  return c.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(), 
+    app: 'PhysioMotion',
+    version: '2.0.0',
+    database: dbStatus,
+    environment: process.env.NODE_ENV || 'development'
   })
 })
 
@@ -100,10 +148,6 @@ app.post('/api/rag/query', async (c) => {
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
-})
-
-app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString(), app: 'PhysioMotion' })
 })
 
 // Camera/device detection API
