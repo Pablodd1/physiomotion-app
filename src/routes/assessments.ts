@@ -1,9 +1,10 @@
-// Assessment Routes - Full Database Integration
+// Assessment Routes - Full Database Integration with XSS Protection
 
 import { Hono } from 'hono'
 import type { Bindings, Variables } from '../types'
 import { authMiddleware } from '../middleware/auth'
 import { getPool } from '../database'
+import { sanitizeString, sanitizeJsonContent } from '../utils/security'
 
 const assessments = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -137,22 +138,35 @@ assessments.post('/', async (c) => {
   }
 
   try {
-    const data = await c.req.json()
+    const rawData = await c.req.json()
     const clinician = c.get('clinician')
 
     // Validate required fields
-    if (!data.patient_id) {
+    if (!rawData.patient_id) {
       return c.json({ success: false, error: 'patient_id is required' }, 400)
     }
 
     // Verify patient exists
     const patient = await pool.query(
       'SELECT id FROM patients WHERE id = $1',
-      [data.patient_id]
+      [rawData.patient_id]
     )
 
     if (patient.rows.length === 0) {
       return c.json({ success: false, error: 'Patient not found' }, 404)
+    }
+
+    // SANITIZE user inputs to prevent XSS
+    const data = {
+      patient_id: rawData.patient_id,
+      clinician_id: clinician?.id || rawData.clinician_id,
+      assessment_type: sanitizeString(rawData.assessment_type) || 'initial',
+      subjective_findings: sanitizeString(rawData.subjective_findings),
+      objective_findings: sanitizeString(rawData.objective_findings),
+      assessment_summary: sanitizeString(rawData.assessment_summary),
+      plan: sanitizeString(rawData.plan),
+      femto_mega_connected: rawData.femto_mega_connected || false,
+      video_recorded: rawData.video_recorded || false
     }
 
     const result = await pool.query(
@@ -165,15 +179,15 @@ assessments.post('/', async (c) => {
       RETURNING *`,
       [
         data.patient_id,
-        clinician?.id || data.clinician_id,
-        data.assessment_type || 'initial',
+        data.clinician_id,
+        data.assessment_type,
         'in_progress',
-        data.subjective_findings || null,
-        data.objective_findings || null,
-        data.assessment_summary || null,
-        data.plan || null,
-        data.femto_mega_connected || false,
-        data.video_recorded || false
+        data.subjective_findings,
+        data.objective_findings,
+        data.assessment_summary,
+        data.plan,
+        data.femto_mega_connected,
+        data.video_recorded
       ]
     )
 
@@ -202,22 +216,47 @@ assessments.put('/:id', async (c) => {
   }
 
   try {
-    const updates = await c.req.json()
+    const rawUpdates = await c.req.json()
 
-    const allowedFields = [
-      'assessment_type', 'assessment_status', 'duration_minutes',
-      'overall_score', 'mobility_score', 'stability_score', 'movement_pattern_score',
-      'subjective_findings', 'objective_findings', 'assessment_summary', 'plan',
-      'femto_mega_connected', 'video_recorded', 'video_url', 'cpt_code', 'billing_status'
+    // Fields that need sanitization (text fields)
+    const textFields = [
+      'assessment_type', 'assessment_status',
+      'subjective_findings', 'objective_findings', 
+      'assessment_summary', 'plan', 'video_url', 'billing_status'
     ]
+    
+    // Fields that are numeric/boolean (no sanitization needed)
+    const numericFields = [
+      'duration_minutes', 'overall_score', 'mobility_score', 
+      'stability_score', 'movement_pattern_score'
+    ]
+    
+    const booleanFields = ['femto_mega_connected', 'video_recorded']
 
     const setFields: string[] = []
     const values: any[] = []
 
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
+    // Sanitize text fields
+    for (const field of textFields) {
+      if (rawUpdates[field] !== undefined) {
         setFields.push(`${field} = $${values.length + 1}`)
-        values.push(updates[field])
+        values.push(sanitizeString(rawUpdates[field]))
+      }
+    }
+    
+    // Handle numeric fields
+    for (const field of numericFields) {
+      if (rawUpdates[field] !== undefined) {
+        setFields.push(`${field} = $${values.length + 1}`)
+        values.push(rawUpdates[field])
+      }
+    }
+    
+    // Handle boolean fields
+    for (const field of booleanFields) {
+      if (rawUpdates[field] !== undefined) {
+        setFields.push(`${field} = $${values.length + 1}`)
+        values.push(rawUpdates[field])
       }
     }
 
@@ -295,7 +334,17 @@ assessments.post('/:id/tests', async (c) => {
   }
 
   try {
-    const data = await c.req.json()
+    const rawData = await c.req.json()
+
+    // SANITIZE test data
+    const data = {
+      test_name: sanitizeString(rawData.test_name),
+      test_category: sanitizeString(rawData.test_category) || 'functional',
+      test_order: rawData.test_order || 1,
+      instructions: sanitizeString(rawData.instructions) || '',
+      demo_video_url: sanitizeString(rawData.demo_video_url),
+      test_status: sanitizeString(rawData.test_status) || 'pending'
+    }
 
     const result = await pool.query(
       `INSERT INTO movement_tests (
@@ -306,11 +355,11 @@ assessments.post('/:id/tests', async (c) => {
       [
         assessmentId,
         data.test_name,
-        data.test_category || 'functional',
-        data.test_order || 1,
-        data.instructions || '',
-        data.demo_video_url || null,
-        data.test_status || 'pending'
+        data.test_category,
+        data.test_order,
+        data.instructions,
+        data.demo_video_url,
+        data.test_status
       ]
     )
 

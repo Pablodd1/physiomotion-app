@@ -221,6 +221,7 @@
                         <i class="fas fa-shield-alt"></i>
                         Check Camera Access
                     </button>
+                    <div id="cameraTips"></div>
                     <br>
                     <button onclick="startAssessment()" class="camera-btn primary" id="startBtn" disabled>
                         <i class="fas fa-play"></i>
@@ -394,22 +395,24 @@
 
     <!-- Video Recording Module -->
     <script src="/static/video-recorder.js"></script>
-    
-    <!-- Main Application Scripts -->
-    <script src="/static/app.js"></script>
-    <script src="/static/assessment-workflow.js"></script>
+    <!-- Femto Mega Client -->
+    <script src="/static/femto-client.js"></script>
+    <!-- High-Quality Camera Manager -->
+    <script src="/static/camera-manager.js"></script>
+    <!-- Enhanced Assessment Workflow v2 -->
+    <script src="/static/assessment-workflow-v2.js"></script>
     <script>
         function toggleGlobalVoice() {
             const btn = document.getElementById('globalVoiceBtn');
-            const service = window.PhysioMotion.VoiceControl;
-            if (service.isListening) {
+            const service = window.PhysioMotion?.VoiceControl;
+            if (service?.isListening) {
                 service.stop();
-                btn.classList.remove('bg-blue-100', 'ring-2', 'ring-blue-500');
-                btn.classList.add('bg-gray-100');
-            } else {
+                btn?.classList.remove('bg-blue-100', 'ring-2', 'ring-blue-500');
+                btn?.classList.add('bg-gray-100');
+            } else if (service) {
                 service.start();
-                btn.classList.remove('bg-gray-100');
-                btn.classList.add('bg-blue-100', 'ring-2', 'ring-blue-500');
+                btn?.classList.remove('bg-gray-100');
+                btn?.classList.add('bg-blue-100', 'ring-2', 'ring-blue-500');
             }
         }
     </script>

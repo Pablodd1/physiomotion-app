@@ -1,4 +1,4 @@
-// Patient Routes - Full CRUD with Database Integration
+// Patient Routes - Full CRUD with Database Integration and XSS Protection
 
 import { Hono } from 'hono'
 import type { Bindings, Variables, Patient, MedicalHistory } from '../types'
@@ -6,6 +6,7 @@ import { authMiddleware, requireRole } from '../middleware/auth'
 import { validate, patientCreateSchema } from '../middleware/validation'
 import { getPool } from '../database'
 import { phiAudit } from '../middleware/hipaa'
+import { sanitizeString, sanitizeEmail, sanitizePhone } from '../utils/security'
 
 const patients = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -216,22 +217,49 @@ patients.put('/:id', async (c) => {
   }
 
   try {
-    const updates = await c.req.json()
+    const rawUpdates = await c.req.json()
     
-    // Whitelist allowed fields
-    const allowedFields = [
-      'first_name', 'last_name', 'date_of_birth', 'gender', 'email', 'phone',
+    // Text fields that need sanitization
+    const textFields = [
+      'first_name', 'last_name', 'gender', 'email', 'phone',
       'emergency_contact_name', 'emergency_contact_phone',
       'address_line1', 'address_line2', 'city', 'state', 'zip_code', 'country',
-      'height_cm', 'weight_kg', 'blood_type',
       'primary_insurance_provider', 'primary_insurance_policy_number', 'primary_insurance_group_number',
-      'referring_physician', 'primary_diagnosis_description', 'notes', 'patient_status'
+      'referring_physician', 'primary_diagnosis_description', 'notes', 'patient_status', 'blood_type'
     ]
+    
+    // Numeric fields (no sanitization)
+    const numericFields = ['height_cm', 'weight_kg']
+
+    // Sanitize inputs
+    const updates: Record<string, any> = {}
+    for (const field of textFields) {
+      if (rawUpdates[field] !== undefined) {
+        if (field === 'email') {
+          updates[field] = sanitizeEmail(rawUpdates[field])
+        } else if (field === 'phone' || field === 'emergency_contact_phone') {
+          updates[field] = sanitizePhone(rawUpdates[field])
+        } else {
+          updates[field] = sanitizeString(rawUpdates[field])
+        }
+      }
+    }
+    
+    for (const field of numericFields) {
+      if (rawUpdates[field] !== undefined) {
+        updates[field] = rawUpdates[field]
+      }
+    }
+    
+    // Handle date_of_birth separately
+    if (rawUpdates.date_of_birth !== undefined) {
+      updates.date_of_birth = rawUpdates.date_of_birth
+    }
 
     const setFields: string[] = []
     const values: any[] = []
 
-    for (const field of allowedFields) {
+    for (const field of Object.keys(updates)) {
       if (updates[field] !== undefined) {
         setFields.push(`${field} = $${values.length + 1}`)
         values.push(updates[field])
@@ -384,7 +412,35 @@ patients.post('/:id/medical-history', async (c) => {
   }
 
   try {
-    const data = await c.req.json()
+    const rawData = await c.req.json()
+
+    // SANITIZE medical history text fields
+    const data = {
+      surgery_type: sanitizeString(rawData.surgery_type),
+      surgery_date: rawData.surgery_date,
+      surgery_description: sanitizeString(rawData.surgery_description),
+      conditions: Array.isArray(rawData.conditions) 
+        ? rawData.conditions.map((c: string) => sanitizeString(c)).filter(Boolean)
+        : [],
+      medications: Array.isArray(rawData.medications)
+        ? rawData.medications.map((m: string) => sanitizeString(m)).filter(Boolean)
+        : [],
+      allergies: Array.isArray(rawData.allergies)
+        ? rawData.allergies.map((a: string) => sanitizeString(a)).filter(Boolean)
+        : [],
+      current_pain_level: rawData.current_pain_level,
+      pain_location: Array.isArray(rawData.pain_location)
+        ? rawData.pain_location.map((p: string) => sanitizeString(p)).filter(Boolean)
+        : [],
+      pain_description: sanitizeString(rawData.pain_description),
+      previous_pt_therapy: rawData.previous_pt_therapy,
+      activity_level: sanitizeString(rawData.activity_level),
+      treatment_goals: sanitizeString(rawData.treatment_goals),
+      occupation: sanitizeString(rawData.occupation),
+      sports_activities: Array.isArray(rawData.sports_activities)
+        ? rawData.sports_activities.map((s: string) => sanitizeString(s)).filter(Boolean)
+        : []
+    }
 
     // Check if medical history exists
     const existing = await pool.query(

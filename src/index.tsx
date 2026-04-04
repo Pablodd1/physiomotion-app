@@ -33,10 +33,25 @@ testConnection().then(connected => {
 // Global Error Handler
 app.use('*', errorHandler)
 
+// CORS configuration - SECURITY FIX: Explicit origin whitelist only
 const corsOptions = {
   origin: (origin: string) => {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || []
-    const isAllowed = allowedOrigins.length === 0 || allowedOrigins.some(o => o.trim() === origin || o.trim() === '*')
+    // Production origins - EXPLICITLY defined, no wildcards
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
+      'https://physiomotion-api-production.up.railway.app',
+      'https://physiomotion.app',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ]
+    
+    // Only allow if origin is in explicit whitelist
+    const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.includes('*')
+    
+    // Log rejected origins for security monitoring
+    if (!isAllowed && process.env.NODE_ENV === 'production') {
+      console.warn(`[SECURITY] CORS rejected origin: ${origin}`)
+    }
+    
     return isAllowed ? origin : null
   },
   credentials: true,

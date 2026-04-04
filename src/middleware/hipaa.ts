@@ -104,6 +104,11 @@ export const hipaaLogger = {
     console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, errorInfo)
   },
 
+  // Simple safe log for non-sensitive info
+  safeLog: (message: string) => {
+    console.log(`[LOG] ${new Date().toISOString()} - ${message}`)
+  },
+
   // Audit logging - goes to database, not console
   audit: async (action: AuditAction, resourceType: ResourceType, details: Record<string, any>) => {
     const pool = getPool()
@@ -335,3 +340,6 @@ export const autoLogoutWarning = createMiddleware<{ Bindings: Bindings, Variable
 
 // Export audit actions for use in routes
 export { SENSITIVE_FIELDS, redactSensitiveData }
+
+// Convenience export for safe logging
+export const safeLog = hipaaLogger.safeLog
