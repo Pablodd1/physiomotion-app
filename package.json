@@ -5,10 +5,9 @@
     "dev": "vite --port 3000 --host",
     "build": "vite build",
     "preview": "vite preview --port 3000 --host",
-    "railway": "tsx server.ts",
-    "start": "tsx server.ts",
+    "start": "npm run build && tsx server.ts",
+    "railway": "npm run build && tsx server.ts",
     "deploy:railway": "git push railway main",
-    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
     "test": "curl http://localhost:3000",
     "tsc": "tsc --noEmit"
   },
