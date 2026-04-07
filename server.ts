@@ -2,6 +2,12 @@ import { serve } from '@hono/node-server';
 import { Pool } from 'pg';
 import { createPostgresAdapter } from './src/db';
 import app from './src/index';
+import { serveStatic } from '@hono/node-server/serve-static';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
@@ -29,12 +35,18 @@ if (process.env.DATABASE_URL) {
 
 // Create middleware to inject DB into context
 app.use('*', async (c, next) => {
-  // Inject database into context
   if (db) {
     c.env = { ...c.env, DB: db };
   }
   await next();
 });
+
+// Serve static files from dist folder
+const distPath = path.join(__dirname, 'dist');
+console.log(`[RAILWAY] Serving static files from: ${distPath}`);
+
+app.use('*', serveStatic({ root: './dist' }));
+app.use('*', serveStatic({ path: './dist/index.html' }));
 
 // Log all registered routes
 const routes: string[] = [];
