@@ -1,0 +1,31 @@
+# AI Search Bots - ALLOW
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Traditional Search - ALLOW
+User-agent: Googlebot
+Allow: /
+
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://physiomotion-api-production.up.railway.app/sitemap.xml
