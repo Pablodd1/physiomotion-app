@@ -43,14 +43,28 @@ for (const p of possiblePaths) {
 }
 
 if (staticPath) {
-  // Serve static files
-  app.use('*', serveStatic({ root: staticPath }));
+  // Serve static files from /static path
+  app.use('/static/*', serveStatic({ root: path.join(staticPath, 'static') }));
   
-  // Fallback to index.html
+  // Serve root index.html for root path
+  app.get('/', (c) => {
+    const indexPath = path.join(staticPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return c.html(fs.readFileSync(indexPath, 'utf-8'));
+    }
+    return c.redirect('/static/login.html');
+  });
+  
+  // Fallback to index.html for SPA routes
   app.get('*', (c) => {
     const indexPath = path.join(staticPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       return c.html(fs.readFileSync(indexPath, 'utf-8'));
+    }
+    // Try to serve from static folder
+    const staticFile = path.join(staticPath, 'static', c.req.path);
+    if (fs.existsSync(staticFile)) {
+      return c.html(fs.readFileSync(staticFile, 'utf-8'));
     }
     return c.json({ error: 'Not found', path: c.req.path }, 404);
   });
