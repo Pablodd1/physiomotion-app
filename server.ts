@@ -5,6 +5,7 @@ import app from './src/index';
 import { serveStatic } from '@hono/node-server/serve-static';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,8 +46,45 @@ app.use('*', async (c, next) => {
 const distPath = path.join(__dirname, 'dist');
 console.log(`[RAILWAY] Serving static files from: ${distPath}`);
 
-app.use('*', serveStatic({ root: './dist' }));
-app.use('*', serveStatic({ path: './dist/index.html' }));
+// Serve static assets
+app.use('/static/*', serveStatic({ root: './dist/static' }));
+app.use('/assets/*', serveStatic({ root: './dist/assets' }));
+
+// Root path - serve index.html or redirect to login
+app.get('/', (c) => {
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return c.html(fs.readFileSync(indexPath, 'utf-8'));
+  }
+  // Fallback to login.html
+  const loginPath = path.join(distPath, 'static', 'login.html');
+  if (fs.existsSync(loginPath)) {
+    return c.html(fs.readFileSync(loginPath, 'utf-8'));
+  }
+  return c.json({ error: 'Frontend not found' }, 500);
+});
+
+// SPA fallback - serve index.html for all non-API routes
+app.get('*', (c) => {
+  // Skip API routes
+  if (c.req.path.startsWith('/api/') || c.req.path === '/api') {
+    return c.json({ error: 'API route not found' }, 404);
+  }
+  
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return c.html(fs.readFileSync(indexPath, 'utf-8'));
+  }
+  
+  // Try static folder
+  const staticPath = path.join(distPath, 'static', c.req.path === '/' ? 'login.html' : c.req.path);
+  if (fs.existsSync(staticPath)) {
+    const content = fs.readFileSync(staticPath, 'utf-8');
+    return c.html(content);
+  }
+  
+  return c.json({ error: 'Not found', path: c.req.path }, 404);
+});
 
 // Log all registered routes
 const routes: string[] = [];

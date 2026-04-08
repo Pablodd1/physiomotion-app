@@ -14,6 +14,9 @@ COPY . .
 # Build the frontend
 RUN npm run build
 
+# Create index.html from login.html for root path
+RUN cp dist/static/login.html dist/index.html || echo "Creating index.html failed"
+
 # Verify dist folder exists
 RUN ls -la dist/ || echo "Build failed - no dist folder"
 
