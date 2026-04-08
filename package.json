@@ -5,8 +5,8 @@
     "dev": "vite --port 3000 --host",
     "build": "vite build",
     "preview": "vite preview --port 3000 --host",
-    "start": "npm run build && tsx server.ts",
-    "railway": "npm run build && tsx server.ts",
+    "start": "node server.mjs",
+    "railway": "npm run build && node server.mjs",
     "deploy:railway": "git push railway main",
     "test": "curl http://localhost:3000",
     "tsc": "tsc --noEmit"
