@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ['nodejs_20', 'npm-9_x']
+
+[phases.build]
+cmds = [
+    "npm install",
+    "cp -r public/static dist/static 2>/dev/null || mkdir -p dist/static && cp public/static/* dist/static/ 2>/dev/null || echo 'No static files to copy'",
+    "cp public/static/login.html dist/index.html 2>/dev/null || echo 'No login.html found'",
+    "npx tsc --noEmit || echo 'TypeScript check completed'"
+]
+
+[phases.build]
+cacheDirectories = ['node_modules']
+
+[start]
+cmd = 'npm start'

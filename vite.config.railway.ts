@@ -1,26 +1,24 @@
 import { defineConfig } from 'vite'
-import devServer from '@hono/vite-dev-server'
+import path from 'path'
 
 export default defineConfig({
-  plugins: [
-    devServer({
-      entry: 'src/index.tsx'
-    })
-  ],
   build: {
     target: 'esnext',
     minify: 'terser',
+    outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
-      input: './server.ts',
+      input: {
+        main: path.resolve(__dirname, 'src/index.tsx')
+      },
       output: {
-        format: 'esm',
-        dir: 'dist',
-        entryFileNames: 'server.js'
+        entryFileNames: 'src/index.js',
+        format: 'esm'
       }
     }
   },
   optimizeDeps: {
-    include: ['three', 'zod', 'bcryptjs']
+    include: ['three', 'zod', 'bcryptjs', 'pg']
   },
   server: {
     port: 3000,
