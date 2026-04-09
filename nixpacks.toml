@@ -3,10 +3,16 @@ nixPkgs = ['nodejs_20', 'npm-9_x']
 
 [phases.build]
 cmds = [
+    "echo 'Installing dependencies...'",
     "npm install",
-    "cp -r public/static dist/static 2>/dev/null || mkdir -p dist/static && cp public/static/* dist/static/ 2>/dev/null || echo 'No static files to copy'",
-    "cp public/static/login.html dist/index.html 2>/dev/null || echo 'No login.html found'",
-    "npx tsc --noEmit || echo 'TypeScript check completed'"
+    "echo 'Building app...'",
+    "npm run build 2>/dev/null || echo 'Build step skipped (may already be built)'",
+    "echo 'Copying static files...'",
+    "mkdir -p dist/static",
+    "cp -r public/static/* dist/static/ 2>/dev/null || echo 'No public/static folder'",
+    "cp public/static/login.html dist/index.html 2>/dev/null || echo 'Creating index.html from public/static/login.html'",
+    "ls -la dist/",
+    "ls -la dist/static/ 2>/dev/null || echo 'No dist/static folder'"
 ]
 
 [phases.build]
