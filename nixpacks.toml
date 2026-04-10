@@ -3,20 +3,21 @@ nixPkgs = ['nodejs_20', 'npm-9_x']
 
 [phases.build]
 cmds = [
-    "echo 'Installing dependencies...'",
+    "echo '=== Building PhysioMotion ==='",
     "npm install",
-    "echo 'Building app...'",
-    "npm run build 2>/dev/null || echo 'Build step skipped (may already be built)'",
-    "echo 'Copying static files...'",
+    "echo '=== Copying static files to dist ==='",
     "mkdir -p dist/static",
-    "cp -r public/static/* dist/static/ 2>/dev/null || echo 'No public/static folder'",
-    "cp public/static/login.html dist/index.html 2>/dev/null || echo 'Creating index.html from public/static/login.html'",
+    "cp -r public/static/* dist/static/ || echo 'Copy failed - checking if source exists'",
+    "ls -la public/static/ || echo 'No public/static folder'",
+    "echo '=== Creating index.html ==='",
+    "cp dist/static/login.html dist/index.html || echo 'Failed to create index.html'",
+    "echo '=== Verifying dist structure ==='",
     "ls -la dist/",
-    "ls -la dist/static/ 2>/dev/null || echo 'No dist/static folder'"
+    "ls -la dist/static/ | head -10 || echo 'No dist/static folder'"
 ]
 
 [phases.build]
-cacheDirectories = ['node_modules']
+cacheDirectories = ['node_modules', 'dist']
 
 [start]
 cmd = 'npm start'
