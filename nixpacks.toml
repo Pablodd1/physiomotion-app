@@ -15,8 +15,6 @@ cmds = [
     "ls -la dist/",
     "ls -la dist/static/ | head -10 || echo 'No dist/static folder'"
 ]
-
-[phases.build]
 cacheDirectories = ['node_modules', 'dist']
 
 [start]
