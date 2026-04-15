@@ -1,15 +1,11 @@
 [phases.build]
-cmds = [
-    "npm install",
-    "npm run build"
-]
+cmds = ["npm install"]
 
 [phases.setup]
-nixPkgs = ["nodejs_22"]
+nixpkgsArchive = "bc3950f3c94d09634ad78345b427c3df6a3e349b"
+
+[phases.setup.nixPkgs]
+nodejs = "20"
 
 [start]
-cmd = "npm start"
-
-[variables]
-NODE_ENV = "production"
-PORT = "3000"
+cmd = "npx tsx server.ts"
