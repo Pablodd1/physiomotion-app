@@ -1,7 +1,5 @@
 import { serve } from '@hono/node-server';
-import { Pool } from 'pg';
-import { createPostgresAdapter } from './src/db';
-import app from './src/index';
+import app from './src/index.js';
 import { serveStatic } from '@hono/node-server/serve-static';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,94 +10,163 @@ const __dirname = path.dirname(__filename);
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-console.log(`[RAILWAY] Server starting on port ${port}...`);
-console.log(`[RAILWAY] Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`[PHYSIOMOTION] Server starting on port ${port}...`);
+console.log(`[PHYSIOMOTION] Environment: ${process.env.NODE_ENV || 'development'}`);
 
-// Initialize PostgreSQL connection
-let db: any = null;
+// Determine the correct static files path
+const possiblePaths = [
+  path.join(__dirname, 'dist', 'static'),
+  path.join(__dirname, 'public', 'static'),
+  path.join(__dirname, 'static'),
+  path.join(process.cwd(), 'dist', 'static'),
+  path.join(process.cwd(), 'public', 'static'),
+];
 
-if (process.env.DATABASE_URL) {
-  try {
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    db = createPostgresAdapter(pool);
-    console.log('[RAILWAY] PostgreSQL database adapter initialized');
-  } catch (error) {
-    console.error('[RAILWAY] Failed to initialize PostgreSQL:', error);
+let staticPath = null;
+for (const testPath of possiblePaths) {
+  if (fs.existsSync(testPath)) {
+    staticPath = testPath;
+    console.log(`[PHYSIOMOTION] Found static files at: ${staticPath}`);
+    break;
   }
-} else {
-  console.warn('[RAILWAY] DATABASE_URL not set - database features will be unavailable');
 }
 
-// Create middleware to inject DB into context
-app.use('*', async (c, next) => {
-  if (db) {
-    c.env = { ...c.env, DB: db };
+if (!staticPath) {
+  console.warn('[PHYSIOMOTION] Static files not found in expected locations');
+  staticPath = path.join(__dirname, 'public', 'static');
+}
+
+// Serve static files with proper MIME types
+app.use('/static/*', async (c, next) => {
+  const filePath = c.req.path.replace('/static/', '');
+  const fullPath = path.join(staticPath, filePath);
+  
+  // Security: prevent directory traversal
+  if (!fullPath.startsWith(staticPath)) {
+    return c.json({ error: 'Invalid path' }, 403);
   }
+  
+  if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+    const ext = path.extname(fullPath).toLowerCase();
+    const mimeTypes = {
+      '.js': 'application/javascript',
+      '.mjs': 'application/javascript',
+      '.css': 'text/css',
+      '.html': 'text/html',
+      '.json': 'application/json',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.ttf': 'font/ttf',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm'
+    };
+    
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    const content = fs.readFileSync(fullPath);
+    
+    c.header('Content-Type', contentType);
+    c.header('Cache-Control', 'public, max-age=3600');
+    return c.body(content);
+  }
+  
   await next();
 });
 
-// Serve static files from dist folder
-const distPath = path.join(__dirname, 'dist');
-console.log(`[RAILWAY] Serving static files from: ${distPath}`);
+// Serve HTML pages
+const servePage = (pageName) => {
+  const possiblePagePaths = [
+    path.join(__dirname, 'public', `${pageName}.html`),
+    path.join(__dirname, 'dist', `${pageName}.html`),
+    path.join(__dirname, `${pageName}.html`),
+    path.join(staticPath, `${pageName}.html`),
+    path.join(process.cwd(), 'public', `${pageName}.html`),
+  ];
+  
+  for (const pagePath of possiblePagePaths) {
+    if (fs.existsSync(pagePath)) {
+      return fs.readFileSync(pagePath, 'utf-8');
+    }
+  }
+  return null;
+};
 
-// Serve static assets
-app.use('/static/*', serveStatic({ root: './dist/static' }));
-app.use('/assets/*', serveStatic({ root: './dist/assets' }));
+// Routes for specific pages
+app.get('/login', (c) => {
+  const content = servePage('login');
+  if (content) return c.html(content);
+  return c.redirect('/');
+});
 
-// Root path - serve index.html or redirect to login
+app.get('/assessment', (c) => {
+  const content = servePage('assessment');
+  if (content) return c.html(content);
+  return c.json({ error: 'Assessment page not found' }, 404);
+});
+
+app.get('/patients', (c) => {
+  const content = servePage('patients');
+  if (content) return c.html(content);
+  return c.json({ error: 'Patients page not found' }, 404);
+});
+
+app.get('/dashboard', (c) => {
+  const content = servePage('dashboard');
+  if (content) return c.html(content);
+  return c.json({ error: 'Dashboard page not found' }, 404);
+});
+
+app.get('/intake', (c) => {
+  const content = servePage('intake');
+  if (content) return c.html(content);
+  return c.json({ error: 'Intake page not found' }, 404);
+});
+
+// Root path - serve main app or redirect to login
 app.get('/', (c) => {
-  const indexPath = path.join(distPath, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return c.html(fs.readFileSync(indexPath, 'utf-8'));
+  const indexPaths = [
+    path.join(__dirname, 'public', 'index.html'),
+    path.join(__dirname, 'dist', 'index.html'),
+    path.join(__dirname, 'index.html'),
+    path.join(staticPath, 'index.html'),
+  ];
+  
+  for (const indexPath of indexPaths) {
+    if (fs.existsSync(indexPath)) {
+      const content = fs.readFileSync(indexPath, 'utf-8');
+      return c.html(content);
+    }
   }
-  // Fallback to login.html
-  const loginPath = path.join(distPath, 'static', 'login.html');
-  if (fs.existsSync(loginPath)) {
-    return c.html(fs.readFileSync(loginPath, 'utf-8'));
-  }
-  return c.json({ error: 'Frontend not found' }, 500);
+  
+  // Fallback to login
+  const loginContent = servePage('login');
+  if (loginContent) return c.html(loginContent);
+  
+  return c.json({ 
+    status: 'PhysioMotion API Running',
+    message: 'Frontend not built. Run build command.',
+    endpoints: ['/api/health', '/api/patients', '/api/assessments']
+  });
 });
 
-// SPA fallback - serve index.html for all non-API routes
-app.get('*', (c) => {
-  // Skip API routes
-  if (c.req.path.startsWith('/api/') || c.req.path === '/api') {
-    return c.json({ error: 'API route not found' }, 404);
-  }
-  
-  const indexPath = path.join(distPath, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return c.html(fs.readFileSync(indexPath, 'utf-8'));
-  }
-  
-  // Try static folder
-  const staticPath = path.join(distPath, 'static', c.req.path === '/' ? 'login.html' : c.req.path);
-  if (fs.existsSync(staticPath)) {
-    const content = fs.readFileSync(staticPath, 'utf-8');
-    return c.html(content);
-  }
-  
-  return c.json({ error: 'Not found', path: c.req.path }, 404);
-});
-
-// Log all registered routes
-const routes: string[] = [];
+// Log registered routes
+console.log('[PHYSIOMOTION] Registered routes:');
 app.routes.forEach((route) => {
-  routes.push(`${route.method} ${route.path}`);
+  console.log(`  ${route.method} ${route.path}`);
 });
-console.log(`[RAILWAY] Registered routes: ${routes.length}`);
-routes.slice(0, 20).forEach(r => console.log(`  ${r}`));
-if (routes.length > 20) {
-  console.log(`  ... and ${routes.length - 20} more`);
-}
 
+// Start server
 serve({
   fetch: app.fetch,
   port
+}, (info) => {
+  console.log(`[PHYSIOMOTION] ✅ Server running at http://localhost:${info.port}`);
+  console.log(`[PHYSIOMOTION] API available at http://localhost:${info.port}/api`);
 });
 
-console.log(`[RAILWAY] Server is running on http://localhost:${port}`);
+export default app;

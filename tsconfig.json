@@ -1,21 +1,34 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": ".",
+    "strict": false,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "types": ["vite/client"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
   },
+  "include": [
+    "src/index.ts",
+    "src/mockData.ts",
+    "server.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
-    "femto_bridge"
+    "femto_bridge",
+    "src/middleware",
+    "src/routes",
+    "src/utils",
+    "src/renderer.tsx",
+    "src/database.ts",
+    "src/types.ts"
   ]
 }

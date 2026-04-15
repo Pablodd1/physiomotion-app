@@ -1,21 +1,15 @@
-[phases.setup]
-nixPkgs = ['nodejs_20', 'npm-9_x']
-
 [phases.build]
 cmds = [
-    "echo '=== Building PhysioMotion ==='",
     "npm install",
-    "echo '=== Copying static files to dist ==='",
-    "mkdir -p dist/static",
-    "cp -r public/static/* dist/static/ || echo 'Copy failed - checking if source exists'",
-    "ls -la public/static/ || echo 'No public/static folder'",
-    "echo '=== Creating index.html ==='",
-    "cp dist/static/login.html dist/index.html || echo 'Failed to create index.html'",
-    "echo '=== Verifying dist structure ==='",
-    "ls -la dist/",
-    "ls -la dist/static/ | head -10 || echo 'No dist/static folder'"
+    "npm run build"
 ]
-cacheDirectories = ['node_modules', 'dist']
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
 
 [start]
-cmd = 'npm start'
+cmd = "npm start"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3000"

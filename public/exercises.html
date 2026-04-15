@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise Library - PhysioMotion</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar { background: #1f2937; min-height: 100vh; }
+        .exercise-card { transition: all 0.2s; }
+        .exercise-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .category-btn { transition: all 0.2s; }
+        .category-btn.active { background: #e0e7ff; color: #4338ca; border-color: #6366f1; }
+        .difficulty-badge { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 9999px; }
+        .difficulty-beginner { background: #d1fae5; color: #065f46; }
+        .difficulty-intermediate { background: #fef3c7; color: #92400e; }
+        .difficulty-advanced { background: #fee2e2; color: #991b1b; }
+        .muscle-tag { background: #f3f4f6; color: #4b5563; font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 text-white">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center mr-3">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">PhysioMotion</h1>
+                        <p class="text-xs text-gray-400">Medical Grade</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="mt-6">
+                <a href="/dashboard" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-home w-6"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/patients" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-users w-6"></i>
+                    <span>Patients</span>
+                </a>
+                <a href="/assessment" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-video w-6"></i>
+                    <span>New Assessment</span>
+                </a>
+                <a href="/exercises" class="flex items-center px-6 py-3 bg-gray-800 border-l-4 border-indigo-500">
+                    <i class="fas fa-dumbbell w-6"></i>
+                    <span>Exercise Library</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-8">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Exercise Library</h1>
+                    <p class="text-gray-600">Browse evidence-based therapeutic exercises</p>
+                </div>
+                <div class="flex space-x-3">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="searchExercises" placeholder="Search exercises..." 
+                               class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                               onkeyup="filterExercises()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- Categories Sidebar -->
+                <div class="lg:w-64">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="font-bold text-gray-800 mb-4">Categories</h3>
+                        <div class="space-y-2">
+                            <button onclick="filterByCategory('all')" class="category-btn active w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-th-large w-6"></i>All Exercises
+                            </button>
+                            <button onclick="filterByCategory('core')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-dot-circle w-6"></i>Core
+                            </button>
+                            <button onclick="filterByCategory('hip')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-arrow-up w-6"></i>Hip
+                            </button>
+                            <button onclick="filterByCategory('knee')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-leg w-6"></i>Knee
+                            </button>
+                            <button onclick="filterByCategory('shoulder')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-hand-point-up w-6"></i>Shoulder
+                            </button>
+                            <button onclick="filterByCategory('balance')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-balance-scale w-6"></i>Balance
+                            </button>
+                            <button onclick="filterByCategory('plyometric')" class="category-btn w-full text-left px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                <i class="fas fa-running w-6"></i>Plyometric
+                            </button>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">Difficulty</h3>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="mr-2 difficulty-filter" value="beginner" onchange="filterExercises()">
+                                    <span class="difficulty-badge difficulty-beginner">Beginner</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="mr-2 difficulty-filter" value="intermediate" onchange="filterExercises()">
+                                    <span class="difficulty-badge difficulty-intermediate">Intermediate</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="mr-2 difficulty-filter" value="advanced" onchange="filterExercises()">
+                                    <span class="difficulty-badge difficulty-advanced">Advanced</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Grid -->
+                <div class="flex-1">
+                    <div id="exerciseGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Loading state -->
+                        <div class="col-span-2 text-center py-12">
+                            <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+                            <p class="text-gray-600 mt-4">Loading exercises...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exercise Detail Modal -->
+    <div id="exerciseModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span id="modalCategory" class="text-sm text-indigo-600 font-medium uppercase">--</span>
+                        <h2 id="modalTitle" class="text-2xl font-bold text-gray-800 mt-1">--</h2>
+                    </div>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="flex items-center mt-3 space-x-3">
+                    <span id="modalDifficulty" class="difficulty-badge">--</span>
+                    <div id="modalMuscles" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="aspect-video bg-gray-100 rounded-lg flex items-center justify-center mb-6">
+                    <i class="fas fa-play-circle text-6xl text-gray-400"></i>
+                </div>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="font-bold text-gray-800 mb-3">Instructions</h3>
+                        <ol id="modalInstructions" class="space-y-2 list-decimal list-inside text-gray-700">
+                            <!-- Populated dynamically -->
+                        </ol>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-800 mb-2"><i class="fas fa-arrow-up mr-2"></i>Progression</h4>
+                            <p id="modalProgression" class="text-sm text-green-700">--</p>
+                        </div>
+                        
+                        <div class="bg-yellow-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-yellow-800 mb-2"><i class="fas fa-arrow-down mr-2"></i>Regression</h4>
+                            <p id="modalRegression" class="text-sm text-yellow-700">--</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-bold text-gray-800 mb-3">Contraindications</h3>
+                        <ul id="modalContraindications" class="space-y-1 list-disc list-inside text-red-600">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 bg-gray-50">
+                <button onclick="prescribeExercise()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold">
+                    <i class="fas fa-plus mr-2"></i>Prescribe to Patient
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allExercises = [];
+        let currentCategory = 'all';
+        let currentExercise = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadExercises();
+        });
+
+        async function loadExercises() {
+            try {
+                const response = await fetch('/api/exercises');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allExercises = data.data;
+                    renderExercises(allExercises);
+                }
+            } catch (error) {
+                console.error('Error loading exercises:', error);
+                document.getElementById('exerciseGrid').innerHTML = `
+                    <div class="col-span-2 text-center py-12 text-red-600">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <p>Failed to load exercises</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderExercises(exercises) {
+            const grid = document.getElementById('exerciseGrid');
+            
+            if (exercises.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-2 text-center py-12">
+                        <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-600">No exercises found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = exercises.map(ex => `
+                <div class="exercise-card bg-white rounded-lg shadow overflow-hidden cursor-pointer" onclick="openExercise('${ex.id}')">
+                    <div class="aspect-video bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                        <i class="fas fa-dumbbell text-4xl text-indigo-400"></i>
+                    </div>
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-gray-800">${ex.name}</h3>
+                            <span class="difficulty-badge difficulty-${ex.difficulty}">${ex.difficulty}</span>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-3">${ex.category.charAt(0).toUpperCase() + ex.category.slice(1)}</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${ex.target_muscles.slice(0, 3).map(m => `<span class="muscle-tag">${m}</span>`).join('')}
+                            ${ex.target_muscles.length > 3 ? `<span class="muscle-tag">+${ex.target_muscles.length - 3}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterByCategory(category) {
+            currentCategory = category;
+            
+            // Update UI
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.category-btn').classList.add('active');
+            
+            filterExercises();
+        }
+
+        function filterExercises() {
+            const searchTerm = document.getElementById('searchExercises').value.toLowerCase();
+            const selectedDifficulties = Array.from(document.querySelectorAll('.difficulty-filter:checked')).map(cb => cb.value);
+            
+            let filtered = allExercises;
+            
+            // Filter by category
+            if (currentCategory !== 'all') {
+                filtered = filtered.filter(ex => ex.category === currentCategory);
+            }
+            
+            // Filter by search
+            if (searchTerm) {
+                filtered = filtered.filter(ex => 
+                    ex.name.toLowerCase().includes(searchTerm) ||
+                    ex.target_muscles.some(m => m.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            // Filter by difficulty
+            if (selectedDifficulties.length > 0) {
+                filtered = filtered.filter(ex => selectedDifficulties.includes(ex.difficulty));
+            }
+            
+            renderExercises(filtered);
+        }
+
+        function openExercise(id) {
+            currentExercise = allExercises.find(ex => ex.id === id);
+            if (!currentExercise) return;
+            
+            document.getElementById('modalCategory').textContent = currentExercise.category;
+            document.getElementById('modalTitle').textContent = currentExercise.name;
+            document.getElementById('modalDifficulty').textContent = currentExercise.difficulty;
+            document.getElementById('modalDifficulty').className = `difficulty-badge difficulty-${currentExercise.difficulty}`;
+            
+            document.getElementById('modalMuscles').innerHTML = currentExercise.target_muscles.map(m => 
+                `<span class="muscle-tag">${m}</span>`
+            ).join('');
+            
+            document.getElementById('modalInstructions').innerHTML = currentExercise.instructions.map(i => 
+                `<li>${i}</li>`
+            ).join('');
+            
+            document.getElementById('modalProgression').textContent = currentExercise.progression;
+            document.getElementById('modalRegression').textContent = currentExercise.regression;
+            
+            document.getElementById('modalContraindications').innerHTML = currentExercise.contraindications.length > 0
+                ? currentExercise.contraindications.map(c => `<li>${c}</li>`).join('')
+                : '<li>No specific contraindications</li>';
+            
+            document.getElementById('exerciseModal').classList.remove('hidden');
+            document.getElementById('exerciseModal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('exerciseModal').classList.add('hidden');
+            document.getElementById('exerciseModal').classList.remove('flex');
+            currentExercise = null;
+        }
+
+        function prescribeExercise() {
+            if (!currentExercise) return;
+            
+            // Redirect to assessment page with exercise pre-selected
+            window.location.href = `/assessment?exercise=${currentExercise.id}`;
+        }
+
+        // Close modal on outside click
+        document.getElementById('exerciseModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('exerciseModal')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

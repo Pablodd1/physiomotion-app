@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patients - PhysioMotion</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar { background: #1f2937; min-height: 100vh; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tab-btn { padding: 12px 24px; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab-btn.active { border-bottom-color: #6366f1; color: #6366f1; font-weight: 600; }
+        .tab-btn:hover { color: #6366f1; }
+        .timeline-item { position: relative; padding-left: 28px; }
+        .timeline-item::before { content: ''; position: absolute; left: 0; top: 8px; width: 12px; height: 12px; background: #6366f1; border-radius: 50%; }
+        .timeline-item::after { content: ''; position: absolute; left: 5px; top: 24px; width: 2px; height: calc(100% - 16px); background: #e5e7eb; }
+        .timeline-item:last-child::after { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 text-white">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center mr-3">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">PhysioMotion</h1>
+                        <p class="text-xs text-gray-400">Medical Grade</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="mt-6">
+                <a href="/dashboard" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-home w-6"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/patients" class="flex items-center px-6 py-3 bg-gray-800 border-l-4 border-indigo-500">
+                    <i class="fas fa-users w-6"></i>
+                    <span>Patients</span>
+                </a>
+                <a href="/assessment" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-video w-6"></i>
+                    <span>New Assessment</span>
+                </a>
+                <a href="/exercises" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-dumbbell w-6"></i>
+                    <span>Exercise Library</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1">
+            <!-- Patient List View (Default) -->
+            <div id="patientListView" class="p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Patients</h1>
+                        <p class="text-gray-600">Manage patient records and assessments</p>
+                    </div>
+                    <a href="/intake" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Add New Patient
+                    </a>
+                </div>
+
+                <!-- Search & Filter -->
+                <div class="card p-4 mb-6">
+                    <div class="flex space-x-4">
+                        <div class="flex-1 relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="searchPatients" placeholder="Search patients..." 
+                                   class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                   onkeyup="filterPatients()">
+                        </div>
+                        <select id="statusFilter" class="px-4 py-2 border border-gray-300 rounded-lg" onchange="filterPatients()">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="post_op">Post-Op</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Patient Table -->
+                <div class="card overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Age/Gender</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Primary Condition</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Latest Assessment</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientsTableBody">
+                            <!-- Populated dynamically -->
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Loading patients...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Patient Detail View (Hidden by default) -->
+            <div id="patientDetailView" class="hidden">
+                <!-- Patient Header -->
+                <div class="bg-white border-b border-gray-200 p-6">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center">
+                            <button onclick="showPatientList()" class="mr-4 text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-arrow-left text-xl"></i>
+                            </button>
+                            <div class="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mr-4">
+                                <span id="patientInitials" class="text-2xl font-bold text-indigo-600">--</span>
+                            </div>
+                            <div>
+                                <h1 id="patientName" class="text-2xl font-bold text-gray-800">--</h1>
+                                <p id="patientInfo" class="text-gray-600">--</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <a id="newAssessmentBtn" href="#" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                                <i class="fas fa-video mr-2"></i>New Assessment
+                            </a>
+                            <button onclick="editPatient()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="flex mt-6 space-x-6">
+                        <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn active">Overview</button>
+                        <button onclick="switchTab('history')" id="tab-history" class="tab-btn">Medical History</button>
+                        <button onclick="switchTab('assessments')" id="tab-assessments" class="tab-btn">Assessments</button>
+                        <button onclick="switchTab('exercises')" id="tab-exercises" class="tab-btn">Exercises</button>
+                        <button onclick="switchTab('progress')" id="tab-progress" class="tab-btn">Progress</button>
+                    </div>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="p-6">
+                    <!-- Overview Tab -->
+                    <div id="content-overview" class="tab-content">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Left Column -->
+                            <div class="lg:col-span-2 space-y-6">
+                                <!-- Current Status -->
+                                <div class="card p-6">
+                                    <h2 class="text-lg font-bold text-gray-800 mb-4">Current Status</h2>
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-600">Pain Level</p>
+                                            <p id="currentPain" class="text-2xl font-bold text-gray-800">--</p>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-600">Sessions</p>
+                                            <p id="totalSessions" class="text-2xl font-bold text-gray-800">--</p>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-600">Assessments</p>
+                                            <p id="totalAssessments" class="text-2xl font-bold text-gray-800">--</p>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-600">Adherence</p>
+                                            <p id="adherenceRate" class="text-2xl font-bold text-gray-800">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Recent Timeline -->
+                                <div class="card p-6">
+                                    <h2 class="text-lg font-bold text-gray-800 mb-4">Recent Activity</h2>
+                                    <div id="timelineContainer" class="space-y-4">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Column -->
+                            <div class="space-y-6">
+                                <!-- Quick Info -->
+                                <div class="card p-6">
+                                    <h2 class="text-lg font-bold text-gray-800 mb-4">Patient Information</h2>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <p class="text-sm text-gray-500">Phone</p>
+                                            <p id="patientPhone" class="font-medium">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Email</p>
+                                            <p id="patientEmail" class="font-medium">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Insurance</p>
+                                            <p id="patientInsurance" class="font-medium">--</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Emergency Contact</p>
+                                            <p id="patientEmergency" class="font-medium">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Pain Chart -->
+                                <div class="card p-6">
+                                    <h2 class="text-lg font-bold text-gray-800 mb-4">Pain Trend</h2>
+                                    <canvas id="patientPainChart" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medical History Tab -->
+                    <div id="content-history" class="tab-content hidden">
+                        <div id="medicalHistoryContent" class="space-y-6">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Assessments Tab -->
+                    <div id="content-assessments" class="tab-content hidden">
+                        <div id="assessmentsContent" class="space-y-4">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Exercises Tab -->
+                    <div id="content-exercises" class="tab-content hidden">
+                        <div id="exercisesContent" class="card overflow-hidden">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Progress Tab -->
+                    <div id="content-progress" class="tab-content hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="card p-6">
+                                <h2 class="text-lg font-bold text-gray-800 mb-4">Functional Score</h2>
+                                <canvas id="functionalChart" height="250"></canvas>
+                            </div>
+                            <div class="card p-6">
+                                <h2 class="text-lg font-bold text-gray-800 mb-4">Range of Motion</h2>
+                                <canvas id="romChart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPatient = null;
+        let allPatients = [];
+        let painChart = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAllPatients();
+            
+            // Check if patient ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const patientId = urlParams.get('id');
+            if (patientId) {
+                viewPatient(parseInt(patientId));
+            }
+        });
+
+        async function loadAllPatients() {
+            try {
+                const response = await fetch('/api/patients');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allPatients = data.data;
+                    renderPatientTable(allPatients);
+                }
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        function renderPatientTable(patients) {
+            const tbody = document.getElementById('patientsTableBody');
+            
+            if (patients.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">No patients found</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = patients.map(p => {
+                const conditions = p.medical_history?.conditions || [];
+                const primaryCondition = conditions[0]?.condition || 'N/A';
+                const latestAssessment = p.assessments?.[p.assessments.length - 1];
+                const age = calculateAge(p.date_of_birth);
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                                    <span class="font-semibold text-indigo-600">${p.first_name[0]}${p.last_name[0]}</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-800">${p.first_name} ${p.last_name}</p>
+                                    <p class="text-sm text-gray-500">ID: ${p.id}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">${age} / ${p.gender === 'male' ? 'M' : 'F'}</td>
+                        <td class="px-6 py-4">${primaryCondition}</td>
+                        <td class="px-6 py-4">
+                            ${latestAssessment ? formatDate(latestAssessment.assessment_date) : 'N/A'}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(p)}">
+                                ${getStatusLabel(p)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="viewPatient(${p.id})" class="text-indigo-600 hover:text-indigo-800">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function viewPatient(id) {
+            try {
+                const response = await fetch(`/api/patients/${id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPatient = data.data;
+                    renderPatientDetail();
+                    document.getElementById('patientListView').classList.add('hidden');
+                    document.getElementById('patientDetailView').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading patient:', error);
+            }
+        }
+
+        function renderPatientDetail() {
+            const p = currentPatient;
+            const age = calculateAge(p.date_of_birth);
+            
+            document.getElementById('patientInitials').textContent = `${p.first_name[0]}${p.last_name[0]}`;
+            document.getElementById('patientName').textContent = `${p.first_name} ${p.last_name}`;
+            document.getElementById('patientInfo').textContent = `${age} years • ${p.gender} • ${p.email}`;
+            document.getElementById('patientPhone').textContent = p.phone || 'N/A';
+            document.getElementById('patientEmail').textContent = p.email;
+            document.getElementById('patientInsurance').textContent = p.insurance?.provider || 'N/A';
+            document.getElementById('patientEmergency').textContent = p.emergency_contact?.name || 'N/A';
+            
+            // Update new assessment button
+            document.getElementById('newAssessmentBtn').href = `/assessment?patient=${p.id}`;
+            
+            // Update stats
+            const latestAssessment = p.assessments?.[p.assessments.length - 1];
+            document.getElementById('currentPain').textContent = latestAssessment?.pain_scale || 'N/A';
+            document.getElementById('totalSessions').textContent = p.exercise_sessions?.length || 0;
+            document.getElementById('totalAssessments').textContent = p.assessments?.length || 0;
+            document.getElementById('adherenceRate').textContent = '85%';
+            
+            // Render timeline
+            renderTimeline(p);
+            
+            // Render charts
+            renderPainChart(p);
+            
+            // Render medical history
+            renderMedicalHistory(p);
+            
+            // Render assessments
+            renderAssessments(p);
+            
+            // Render exercises
+            renderExercises(p);
+            
+            // Render progress charts
+            renderProgressCharts(p);
+        }
+
+        function renderTimeline(p) {
+            const container = document.getElementById('timelineContainer');
+            const events = [];
+            
+            // Add assessments
+            (p.assessments || []).forEach(a => {
+                events.push({
+                    date: a.assessment_date,
+                    type: 'assessment',
+                    title: a.assessment_type,
+                    description: `Pain: ${a.pain_scale}/10`
+                });
+            });
+            
+            // Add sessions
+            (p.exercise_sessions || []).forEach(s => {
+                events.push({
+                    date: s.session_date,
+                    type: 'session',
+                    title: 'Exercise Session',
+                    description: `${s.exercises_completed?.length || 0} exercises • ${s.duration_minutes} min`
+                });
+            });
+            
+            // Sort by date
+            events.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            container.innerHTML = events.slice(0, 5).map(e => `
+                <div class="timeline-item">
+                    <p class="text-sm text-gray-500">${formatDate(e.date)}</p>
+                    <p class="font-medium text-gray-800">${e.title}</p>
+                    <p class="text-sm text-gray-600">${e.description}</p>
+                </div>
+            `).join('') || '<p class="text-gray-500">No activity recorded</p>';
+        }
+
+        function renderPainChart(p) {
+            const ctx = document.getElementById('patientPainChart').getContext('2d');
+            
+            if (painChart) painChart.destroy();
+            
+            const painData = p.progress_metrics?.pain_trend || [0];
+            
+            painChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: painData.map((_, i) => `Week ${i + 1}`),
+                    datasets: [{
+                        label: 'Pain Level',
+                        data: painData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 10, title: { display: true, text: 'Pain (0-10)' } }
+                    }
+                }
+            });
+        }
+
+        function renderMedicalHistory(p) {
+            const container = document.getElementById('medicalHistoryContent');
+            const mh = p.medical_history || {};
+            
+            container.innerHTML = `
+                <div class="card p-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Conditions</h3>
+                    ${(mh.conditions || []).map(c => `
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span>${c.condition}</span>
+                            <span class="text-sm text-gray-500">${c.status} • ${formatDate(c.diagnosed_date)}</span>
+                        </div>
+                    `).join('') || '<p class="text-gray-500">No conditions recorded</p>'}
+                </div>
+                
+                <div class="card p-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Medications</h3>
+                    ${(mh.medications || []).map(m => `
+                        <div class="py-2 border-b border-gray-100">
+                            <p class="font-medium">${m.name} ${m.dosage}</p>
+                            <p class="text-sm text-gray-500">${m.frequency} • ${m.reason}</p>
+                        </div>
+                    `).join('') || '<p class="text-gray-500">No medications recorded</p>'}
+                </div>
+                
+                <div class="card p-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Allergies</h3>
+                    ${(mh.allergies || []).length > 0 
+                        ? mh.allergies.map(a => `<span class="inline-block bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm mr-2 mb-2">${a}</span>
+                        `).join('')
+                        : '<p class="text-gray-500">No allergies recorded</p>'}
+                </div>
+            `;
+        }
+
+        function renderAssessments(p) {
+            const container = document.getElementById('assessmentsContent');
+            
+            container.innerHTML = (p.assessments || []).map(a => `
+                <div class="card p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${a.assessment_type}</h3>
+                            <p class="text-sm text-gray-500">${formatDate(a.assessment_date)} • ${a.clinician}</p>
+                        </div>
+                        <span class="px-3 py-1 bg-gray-100 rounded-full text-sm">Pain: ${a.pain_scale}/10</span>
+                    </div>
+                    
+                    ${a.chief_complaint ? `
+                        <div class="mt-4">
+                            <p class="text-sm font-medium text-gray-600">Chief Complaint:</p>
+                            <p class="text-gray-800">${a.chief_complaint}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${a.tests?.length > 0 ? `
+                        <div class="mt-4">
+                            <p class="text-sm font-medium text-gray-600">Tests Performed:</p>
+                            <ul class="mt-2 space-y-1">
+                                ${a.tests.map(t => `<li class="text-sm text-gray-700">• ${t.test_name}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    ${a.clinical_notes ? `
+                        <div class="mt-4 p-4 bg-gray-50 rounded">
+                            <p class="text-sm font-medium text-gray-600">Clinical Notes:</p>
+                            <p class="text-gray-800 text-sm mt-1">${a.clinical_notes}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('') || '<p class="text-gray-500">No assessments recorded</p>';
+        }
+
+        function renderExercises(p) {
+            const container = document.getElementById('exercisesContent');
+            
+            // Get all prescriptions from all assessments
+            const prescriptions = (p.assessments || []).flatMap(a => 
+                (a.prescriptions || []).map(p => ({ ...p, assessment_date: a.assessment_date }))
+            );
+            
+            if (prescriptions.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-gray-500">No exercises prescribed</div>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exercise</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dosage</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequency</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prescribed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${prescriptions.map(p => `
+                            <tr class="border-b border-gray-100">
+                                <td class="px-6 py-4">${p.exercise_name}</td>
+                                <td class="px-6 py-4">${p.sets} sets x ${p.reps} reps</td>
+                                <td class="px-6 py-4">${p.frequency}</td>
+                                <td class="px-6 py-4">${formatDate(p.assessment_date)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderProgressCharts(p) {
+            const functionalCtx = document.getElementById('functionalChart').getContext('2d');
+            const romCtx = document.getElementById('romChart').getContext('2d');
+            
+            const functionalData = p.progress_metrics?.functional_score_trend || [50, 55, 60, 65, 70];
+            
+            new Chart(functionalCtx, {
+                type: 'line',
+                data: {
+                    labels: functionalData.map((_, i) => `Week ${i + 1}`),
+                    datasets: [{
+                        label: 'Functional Score',
+                        data: functionalData,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+            
+            // ROM chart (mock data based on assessments)
+            new Chart(romCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Initial', 'Current'],
+                    datasets: [{
+                        label: 'ROM (degrees)',
+                        data: [60, 85],
+                        backgroundColor: ['#9ca3af', '#10b981']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function switchTab(tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected content
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        function showPatientList() {
+            document.getElementById('patientDetailView').classList.add('hidden');
+            document.getElementById('patientListView').classList.remove('hidden');
+            window.history.replaceState({}, '', '/patients');
+        }
+
+        function filterPatients() {
+            const search = document.getElementById('searchPatients').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            
+            let filtered = allPatients;
+            
+            if (search) {
+                filtered = filtered.filter(p => 
+                    `${p.first_name} ${p.last_name}`.toLowerCase().includes(search) ||
+                    p.email?.toLowerCase().includes(search)
+                );
+            }
+            
+            renderPatientTable(filtered);
+        }
+
+        function getStatusColor(p) {
+            const conditions = p.medical_history?.conditions || [];
+            if (conditions.some(c => c.status === 'post_op')) return 'bg-blue-100 text-blue-700';
+            if (conditions.some(c => c.status === 'active')) return 'bg-yellow-100 text-yellow-700';
+            return 'bg-green-100 text-green-700';
+        }
+
+        function getStatusLabel(p) {
+            const conditions = p.medical_history?.conditions || [];
+            if (conditions.some(c => c.status === 'post_op')) return 'Post-Op';
+            if (conditions.some(c => c.status === 'active')) return 'Active';
+            return 'Stable';
+        }
+
+        function calculateAge(dob) {
+            const birthDate = new Date(dob);
+            const diff = Date.now() - birthDate.getTime();
+            return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        }
+
+        function editPatient() {
+            alert('Edit patient functionality would open a modal or form here');
+        }
+    </script>
+</body>
+</html>

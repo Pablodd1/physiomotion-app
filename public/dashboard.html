@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PhysioMotion</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .patient-row { transition: background 0.2s; }
+        .patient-row:hover { background: #f9fafb; }
+        .status-badge { font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 9999px; }
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-postop { background: #dbeafe; color: #1e40af; }
+        .sidebar { background: #1f2937; min-height: 100vh; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 text-white">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full gradient-bg flex items-center justify-center mr-3">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">PhysioMotion</h1>
+                        <p class="text-xs text-gray-400">Medical Grade</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="mt-6">
+                <a href="/dashboard" class="flex items-center px-6 py-3 bg-gray-800 border-l-4 border-indigo-500">
+                    <i class="fas fa-home w-6"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/patients" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-users w-6"></i>
+                    <span>Patients</span>
+                </a>
+                <a href="/assessment" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-video w-6"></i>
+                    <span>New Assessment</span>
+                </a>
+                <a href="/exercises" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-dumbbell w-6"></i>
+                    <span>Exercise Library</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-file-medical w-6"></i>
+                    <span>Reports</span>
+                </a>
+            </nav>
+
+            <div class="absolute bottom-0 w-64 p-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center mr-3">
+                        <i class="fas fa-user-md"></i>
+                    </div>
+                    <div>
+                        <p class="font-medium" id="userName">Dr. Demo</p>
+                        <p class="text-xs text-gray-400">PT License #12345</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="mt-4 w-full text-left text-sm text-gray-400 hover:text-white">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-8">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+                    <p class="text-gray-600">Welcome back! Here's what's happening today.</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="/intake" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center">
+                        <i class="fas fa-plus mr-2"></i>New Patient
+                    </a>
+                    <a href="/assessment" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                        <i class="fas fa-video mr-2"></i>New Assessment
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="card p-6 stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Patients</p>
+                            <p class="text-3xl font-bold text-gray-800" id="statPatients">--</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <i class="fas fa-users text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6 stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Active Treatments</p>
+                            <p class="text-3xl font-bold text-gray-800" id="statActive">--</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6 stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Assessments</p>
+                            <p class="text-3xl font-bold text-gray-800" id="statAssessments">--</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                            <i class="fas fa-clipboard-check text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6 stat-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Sessions Today</p>
+                            <p class="text-3xl font-bold text-gray-800" id="statSessions">--</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                            <i class="fas fa-running text-orange-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Patient List -->
+                <div class="lg:col-span-2 card">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-lg font-bold text-gray-800">Recent Patients</h2>
+                            <a href="/patients" class="text-indigo-600 hover:text-indigo-800 text-sm">View All →</a>
+                        </div>
+                    </div>
+                    <div id="patientList">
+                        <!-- Loading state -->
+                        <div class="p-6 text-center">
+                            <i class="fas fa-spinner fa-spin text-gray-400 text-2xl"></i>
+                            <p class="text-gray-600 mt-2">Loading patients...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity & Chart -->
+                <div class="space-y-6">
+                    <!-- Pain Trend Chart -->
+                    <div class="card p-6">
+                        <h2 class="text-lg font-bold text-gray-800 mb-4">Average Pain Trend</h2>
+                        <canvas id="painChart" height="200"></canvas>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="card">
+                        <div class="p-6 border-b border-gray-200">
+                            <h2 class="text-lg font-bold text-gray-800">Recent Activity</h2>
+                        </div>
+                        <div id="activityList" class="p-6 space-y-4">
+                            <!-- Loading state -->
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check auth
+        const token = localStorage.getItem('physio_token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        const user = JSON.parse(localStorage.getItem('physio_user') || '{}');
+        if (user.name) {
+            document.getElementById('userName').textContent = user.name;
+        }
+
+        function logout() {
+            localStorage.removeItem('physio_token');
+            localStorage.removeItem('physio_user');
+            window.location.href = '/login';
+        }
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStats(data.data);
+                    renderPatientList(data.data.recent_activity);
+                    renderActivityList(data.data.recent_activity);
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('statPatients').textContent = stats.total_patients;
+            document.getElementById('statActive').textContent = stats.active_patients;
+            document.getElementById('statAssessments').textContent = stats.total_assessments;
+            document.getElementById('statSessions').textContent = stats.total_sessions;
+
+            // Create pain trend chart
+            createPainChart();
+        }
+
+        function createPainChart() {
+            const ctx = document.getElementById('painChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+                    datasets: [{
+                        label: 'Avg Pain (0-10)',
+                        data: [6.2, 5.8, 5.2, 4.5, 3.8, 3.2],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 10, title: { display: true, text: 'Pain Level' } }
+                    }
+                }
+            });
+        }
+
+        async function renderPatientList() {
+            try {
+                const response = await fetch('/api/patients');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const container = document.getElementById('patientList');
+                    const patients = data.data.slice(0, 5);
+                    
+                    container.innerHTML = patients.map(p => `
+                        <div class="patient-row p-4 border-b border-gray-100 cursor-pointer" onclick="viewPatient(${p.id})">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mr-4">
+                                    <span class="font-semibold text-gray-600">${p.first_name[0]}${p.last_name[0]}</span>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-semibold text-gray-800">${p.first_name} ${p.last_name}</p>
+                                    <p class="text-sm text-gray-500">${calculateAge(p.date_of_birth)} years • ${p.gender}</p>
+                                </div>
+                                <span class="status-badge ${p.pain_trend?.length > 0 && p.pain_trend[p.pain_trend.length - 1] < p.pain_trend[0] ? 'status-active' : 'status-postop'}">
+                                    ${p.pain_trend?.length > 0 && p.pain_trend[p.pain_trend.length - 1] < p.pain_trend[0] ? 'Improving' : 'Active'}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        function renderActivityList(activities) {
+            const container = document.getElementById('activityList');
+            
+            if (!activities || activities.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center">No recent activity</p>';
+                return;
+            }
+            
+            container.innerHTML = activities.map(a => `
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-check text-green-600 text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-800">${a.patient_name}</p>
+                        <p class="text-xs text-gray-500">${a.exercises} exercises • ${a.duration} min</p>
+                    </div>
+                    <span class="text-xs text-gray-400">${formatDate(a.date)}</span>
+                </div>
+            `).join('');
+        }
+
+        function calculateAge(dob) {
+            const birthDate = new Date(dob);
+            const diff = Date.now() - birthDate.getTime();
+            return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function viewPatient(id) {
+            window.location.href = `/patients?id=${id}`;
+        }
+
+        // Load data on page load
+        loadDashboard();
+    </script>
+</body>
+</html>

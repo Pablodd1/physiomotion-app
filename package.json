@@ -1,15 +1,18 @@
 {
-  "name": "webapp",
+  "name": "physiomotion",
+  "version": "2.0.0-demo",
+  "description": "Medical Movement Assessment Platform with AI-powered pose detection",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3000 --host",
-    "build": "vite build",
-    "preview": "vite preview --port 3000 --host",
-    "start": "node server.mjs",
-    "railway": "npm run build && node server.mjs",
-    "deploy:railway": "git push railway main",
-    "test": "curl http://localhost:3000",
-    "tsc": "tsc --noEmit"
+    "dev": "tsx server.ts",
+    "build": "tsc && npm run copy-static",
+    "copy-static": "cp -r public dist/ 2>/dev/null || echo 'No public dir to copy'",
+    "start": "node dist/server.js",
+    "railway": "npm run build && npm start",
+    "preview": "npm run build && npm start",
+    "test": "curl http://localhost:3000/api/health",
+    "tsc": "tsc",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",

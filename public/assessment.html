@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Assessment - PhysioMotion</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar { background: #1f2937; min-height: 100vh; }
+        .camera-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
+        .camera-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+        .quality-indicator { position: absolute; top: 16px; right: 16px; padding: 8px 16px; border-radius: 20px; font-weight: 600; }
+        .quality-good { background: rgba(16, 185, 129, 0.9); color: white; }
+        .quality-poor { background: rgba(239, 68, 68, 0.9); color: white; }
+        .quality-fair { background: rgba(245, 158, 11, 0.9); color: white; }
+        .joint-marker { position: absolute; width: 12px; height: 12px; background: #10b981; border-radius: 50%; transform: translate(-50%, -50%); }
+        .skeleton-line { position: absolute; background: #10b981; transform-origin: left center; height: 3px; }
+        .angle-display { position: absolute; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        #canvas-output { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .metric-card { background: white; border-radius: 8px; padding: 12px; border: 1px solid #e5e7eb; }
+        .metric-value { font-size: 24px; font-weight: 700; color: #1f2937; }
+        .metric-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
+        .exercise-btn { transition: all 0.2s; }
+        .exercise-btn:hover { transform: translateX(4px); }
+        .exercise-btn.active { background: #e0e7ff; border-left: 4px solid #6366f1; }
+        .recording-dot { animation: pulse-red 1s infinite; }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 text-white">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center mr-3">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">PhysioMotion</h1>
+                        <p class="text-xs text-gray-400">Medical Grade</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="mt-6">
+                <a href="/dashboard" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-home w-6"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/patients" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-users w-6"></i>
+                    <span>Patients</span>
+                </a>
+                <a href="/assessment" class="flex items-center px-6 py-3 bg-gray-800 border-l-4 border-indigo-500">
+                    <i class="fas fa-video w-6"></i>
+                    <span>New Assessment</span>
+                </a>
+                <a href="/exercises" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
+                    <i class="fas fa-dumbbell w-6"></i>
+                    <span>Exercise Library</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-6">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Video Assessment</h1>
+                    <p class="text-gray-600">Record and analyze patient movement with AI-powered pose detection</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <select id="patientSelect" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="">Select Patient...</option>
+                    </select>
+                    <button onclick="window.location.href='/dashboard'" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Column: Exercise Selection -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow mb-6">
+                        <div class="p-4 border-b border-gray-200">
+                            <h2 class="font-bold text-gray-800">Select Exercise</h2>
+                        </div>
+                        <div id="exerciseList" class="max-h-64 overflow-y-auto">
+                            <!-- Exercises loaded dynamically -->
+                            <div class="p-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="font-bold text-gray-800 mb-3">Assessment Settings</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="showSkeleton" checked class="mr-2">
+                                Show Skeleton
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="showAngles" checked class="mr-2">
+                                Show Joint Angles
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="recordVideo" class="mr-2">
+                                Record Video
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center: Camera Feed -->
+                <div class="lg:col-span-2">
+                    <div class="camera-container aspect-video mb-4">
+                        <video id="input-video" class="w-full h-full object-cover" playsinline></video>
+                        <canvas id="output-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                        
+                        <!-- Quality Indicator -->
+                        <div id="qualityIndicator" class="quality-indicator quality-poor">
+                            <i class="fas fa-circle text-xs mr-2"></i>
+                            <span>Initializing...</span>
+                        </div>
+
+                        <!-- Recording Indicator -->
+                        <div id="recordingIndicator" class="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full hidden">
+                            <i class="fas fa-circle recording-dot mr-2"></i>
+                            REC <span id="recordingTime">00:00</span>
+                        </div>
+
+                        <!-- Camera Controls Overlay -->
+                        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-3">
+                            <button id="startCameraBtn" onclick="startCamera()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full flex items-center">
+                                <i class="fas fa-video mr-2"></i>Start Camera
+                            </button>
+                            <button id="stopCameraBtn" onclick="stopCamera()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full hidden">
+                                <i class="fas fa-stop mr-2"></i>Stop
+                            </button>
+                            <button id="captureBtn" onclick="captureFrame()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full hidden">
+                                <i class="fas fa-camera mr-2"></i>Capture
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Metrics -->
+                    <div id="metricsPanel" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div class="metric-card">
+                            <p class="metric-label">FPS</p>
+                            <p id="fpsMetric" class="metric-value">--</p>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-label">Detection</p>
+                            <p id="detectionMetric" class="metric-value">--</p>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-label">Knee Angle</p>
+                            <p id="kneeAngleMetric" class="metric-value">--</p>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-label">Hip Angle</p>
+                            <p id="hipAngleMetric" class="metric-value">--</p>
+                        </div>
+                    </div>
+
+                    <!-- Assessment Controls -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-800">Assessment Controls</h3>
+                            <span id="selectedExercise" class="text-sm text-indigo-600 font-medium">No exercise selected</span>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button onclick="startAssessment()" id="startAssessmentBtn" disabled class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
+                                <i class="fas fa-play mr-2"></i>Start Assessment
+                            </button>
+                            <button onclick="pauseAssessment()" id="pauseAssessmentBtn" disabled class="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
+                                <i class="fas fa-pause mr-2"></i>Pause
+                            </button>
+                            <button onclick="finishAssessment()" id="finishAssessmentBtn" disabled class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
+                                <i class="fas fa-check mr-2"></i>Finish
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Panel -->
+                    <div id="resultsPanel" class="bg-white rounded-lg shadow p-4 mt-4 hidden">
+                        <h3 class="font-bold text-gray-800 mb-3">Assessment Results</h3>
+                        <div id="resultsContent" class="space-y-2">
+                            <!-- Results populated dynamically -->
+                        </div>
+                        
+                        <div class="mt-4 flex space-x-3">
+                            <button onclick="generateReport()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg">
+                                <i class="fas fa-file-medical mr-2"></i>Generate Report
+                            </button>
+                            <button onclick="saveToEHR()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
+                                <i class="fas fa-save mr-2"></i>Save to Record
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let pose = null;
+        let camera = null;
+        let isCameraRunning = false;
+        let isAssessmentRunning = false;
+        let selectedExercise = null;
+        let selectedPatient = null;
+        let assessmentData = [];
+        let recordingStartTime = null;
+        let recordingInterval = null;
+        let frameCount = 0;
+        let lastFpsTime = Date.now();
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPatients();
+            loadExercises();
+            initializePose();
+        });
+
+        function initializePose() {
+            pose = new Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                }
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults(onPoseResults);
+        }
+
+        function onPoseResults(results) {
+            const canvas = document.getElementById('output-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (results.poseLandmarks) {
+                // Update detection metric
+                document.getElementById('detectionMetric').textContent = 'Detected';
+                document.getElementById('detectionMetric').style.color = '#10b981';
+                
+                // Update quality indicator
+                updateQualityIndicator(results.poseLandmarks);
+                
+                // Draw skeleton if enabled
+                if (document.getElementById('showSkeleton').checked) {
+                    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+                    drawLandmarks(ctx, results.poseLandmarks, {color: '#FF0000', lineWidth: 1, radius: 3});
+                }
+                
+                // Calculate and display angles
+                if (document.getElementById('showAngles').checked) {
+                    calculateAngles(results.poseLandmarks, canvas);
+                }
+                
+                // Record data if assessment is running
+                if (isAssessmentRunning) {
+                    recordFrameData(results.poseLandmarks);
+                }
+            } else {
+                document.getElementById('detectionMetric').textContent = 'Not detected';
+                document.getElementById('detectionMetric').style.color = '#ef4444';
+            }
+            
+            // Update FPS
+            updateFPS();
+        }
+
+        function updateFPS() {
+            frameCount++;
+            const now = Date.now();
+            if (now - lastFpsTime >= 1000) {
+                document.getElementById('fpsMetric').textContent = frameCount;
+                frameCount = 0;
+                lastFpsTime = now;
+            }
+        }
+
+        function updateQualityIndicator(landmarks) {
+            const indicator = document.getElementById('qualityIndicator');
+            const visibleJoints = landmarks.filter(l => l.visibility > 0.5).length;
+            const totalJoints = landmarks.length;
+            const visibilityPercent = (visibleJoints / totalJoints) * 100;
+            
+            if (visibilityPercent >= 80) {
+                indicator.className = 'quality-indicator quality-good';
+                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Good Quality</span>';
+            } else if (visibilityPercent >= 50) {
+                indicator.className = 'quality-indicator quality-fair';
+                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Fair Quality</span>';
+            } else {
+                indicator.className = 'quality-indicator quality-poor';
+                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Poor Visibility</span>';
+            }
+        }
+
+        function calculateAngles(landmarks, canvas) {
+            // Calculate knee angle (hip-knee-ankle)
+            const leftKneeAngle = calculateJointAngle(
+                landmarks[23], landmarks[25], landmarks[27]
+            );
+            const rightKneeAngle = calculateJointAngle(
+                landmarks[24], landmarks[26], landmarks[28]
+            );
+            
+            // Calculate hip angle (shoulder-hip-knee)
+            const leftHipAngle = calculateJointAngle(
+                landmarks[11], landmarks[23], landmarks[25]
+            );
+            const rightHipAngle = calculateJointAngle(
+                landmarks[12], landmarks[24], landmarks[26]
+            );
+            
+            // Update display
+            document.getElementById('kneeAngleMetric').textContent = 
+                `${Math.round((leftKneeAngle + rightKneeAngle) / 2)}°`;
+            document.getElementById('hipAngleMetric').textContent = 
+                `${Math.round((leftHipAngle + rightHipAngle) / 2)}°`;
+        }
+
+        function calculateJointAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - 
+                           Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        async function startCamera() {
+            const video = document.getElementById('input-video');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 30 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                video.play();
+                
+                // Set canvas size to match video
+                video.addEventListener('loadedmetadata', () => {
+                    const canvas = document.getElementById('output-canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                });
+                
+                // Start processing frames
+                isCameraRunning = true;
+                processVideo();
+                
+                // Update UI
+                document.getElementById('startCameraBtn').classList.add('hidden');
+                document.getElementById('stopCameraBtn').classList.remove('hidden');
+                document.getElementById('captureBtn').classList.remove('hidden');
+                document.getElementById('startAssessmentBtn').disabled = false;
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                alert('Could not access camera. Please ensure camera permissions are granted.');
+            }
+        }
+
+        function stopCamera() {
+            const video = document.getElementById('input-video');
+            const stream = video.srcObject;
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            
+            video.srcObject = null;
+            isCameraRunning = false;
+            
+            // Update UI
+            document.getElementById('startCameraBtn').classList.remove('hidden');
+            document.getElementById('stopCameraBtn').classList.add('hidden');
+            document.getElementById('captureBtn').classList.add('hidden');
+            document.getElementById('startAssessmentBtn').disabled = true;
+        }
+
+        async function processVideo() {
+            if (!isCameraRunning) return;
+            
+            const video = document.getElementById('input-video');
+            if (video.readyState >= 2) {
+                await pose.send({image: video});
+            }
+            
+            requestAnimationFrame(processVideo);
+        }
+
+        function captureFrame() {
+            const canvas = document.getElementById('output-canvas');
+            const link = document.createElement('a');
+            link.download = `assessment-${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function startAssessment() {
+            if (!selectedExercise) {
+                alert('Please select an exercise first');
+                return;
+            }
+            
+            isAssessmentRunning = true;
+            assessmentData = [];
+            recordingStartTime = Date.now();
+            
+            // Update UI
+            document.getElementById('recordingIndicator').classList.remove('hidden');
+            document.getElementById('startAssessmentBtn').disabled = true;
+            document.getElementById('pauseAssessmentBtn').disabled = false;
+            document.getElementById('finishAssessmentBtn').disabled = false;
+            
+            // Start recording timer
+            recordingInterval = setInterval(() => {
+                const elapsed = Date.now() - recordingStartTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                document.getElementById('recordingTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function pauseAssessment() {
+            isAssessmentRunning = !isAssessmentRunning;
+            const btn = document.getElementById('pauseAssessmentBtn');
+            
+            if (isAssessmentRunning) {
+                btn.innerHTML = '<i class="fas fa-pause mr-2"></i>Pause';
+            } else {
+                btn.innerHTML = '<i class="fas fa-play mr-2"></i>Resume';
+            }
+        }
+
+        function finishAssessment() {
+            isAssessmentRunning = false;
+            clearInterval(recordingInterval);
+            
+            // Update UI
+            document.getElementById('recordingIndicator').classList.add('hidden');
+            document.getElementById('pauseAssessmentBtn').disabled = true;
+            document.getElementById('finishAssessmentBtn').disabled = true;
+            document.getElementById('startAssessmentBtn').disabled = false;
+            
+            // Show results
+            showResults();
+        }
+
+        function recordFrameData(landmarks) {
+            const frameData = {
+                timestamp: Date.now(),
+                landmarks: landmarks.map(l => ({
+                    x: l.x,
+                    y: l.y,
+                    z: l.z,
+                    visibility: l.visibility
+                })),
+                kneeAngle: calculateJointAngle(landmarks[23], landmarks[25], landmarks[27]),
+                hipAngle: calculateJointAngle(landmarks[11], landmarks[23], landmarks[25])
+            };
+            
+            assessmentData.push(frameData);
+        }
+
+        function showResults() {
+            const panel = document.getElementById('resultsPanel');
+            const content = document.getElementById('resultsContent');
+            
+            // Calculate statistics
+            const kneeAngles = assessmentData.map(d => d.kneeAngle);
+            const hipAngles = assessmentData.map(d => d.hipAngle);
+            
+            const stats = {
+                duration: document.getElementById('recordingTime').textContent,
+                frames: assessmentData.length,
+                minKnee: Math.round(Math.min(...kneeAngles)),
+                maxKnee: Math.round(Math.max(...kneeAngles)),
+                avgKnee: Math.round(kneeAngles.reduce((a, b) => a + b, 0) / kneeAngles.length),
+                minHip: Math.round(Math.min(...hipAngles)),
+                maxHip: Math.round(Math.max(...hipAngles)),
+                avgHip: Math.round(hipAngles.reduce((a, b) => a + b, 0) / hipAngles.length)
+            };
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-50 p-3 rounded">
+                        <p class="text-sm text-gray-600">Duration</p>
+                        <p class="text-lg font-bold">${stats.duration}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <p class="text-sm text-gray-600">Frames Captured</p>
+                        <p class="text-lg font-bold">${stats.frames}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <p class="text-sm text-gray-600">Knee ROM</p>
+                        <p class="text-lg font-bold">${stats.minKnee}° - ${stats.maxKnee}°</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <p class="text-sm text-gray-600">Hip ROM</p>
+                        <p class="text-lg font-bold">${stats.minHip}° - ${stats.maxHip}°</p>
+                    </div>
+                </div>
+            `;
+            
+            panel.classList.remove('hidden');
+        }
+
+        async function loadPatients() {
+            try {
+                const response = await fetch('/api/patients');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('patientSelect');
+                    data.data.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = `${p.first_name} ${p.last_name}`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        async function loadExercises() {
+            try {
+                const response = await fetch('/api/exercises');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const container = document.getElementById('exerciseList');
+                    container.innerHTML = data.data.map(ex => `
+                        <div class="exercise-btn p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50"
+                             onclick="selectExercise('${ex.id}', '${ex.name}')">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center mr-3">
+                                    <i class="fas fa-dumbbell text-indigo-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-800">${ex.name}</p>
+                                    <p class="text-xs text-gray-500">${ex.category} • ${ex.difficulty}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading exercises:', error);
+            }
+        }
+
+        function selectExercise(id, name) {
+            selectedExercise = { id, name };
+            document.getElementById('selectedExercise').textContent = name;
+            
+            // Update UI
+            document.querySelectorAll('.exercise-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            if (isCameraRunning) {
+                document.getElementById('startAssessmentBtn').disabled = false;
+            }
+        }
+
+        function generateReport() {
+            alert('Report generation would create a PDF with assessment data, charts, and recommendations.');
+        }
+
+        function saveToEHR() {
+            alert('Assessment data would be saved to the patient\'s electronic health record.');
+        }
+    </script>
+</body>
+</html>
