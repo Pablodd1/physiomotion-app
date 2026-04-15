@@ -4,9 +4,9 @@
   "description": "Medical Movement Assessment Platform with AI-powered pose detection",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "tsx app.ts",
     "build": "echo 'No build needed - runs directly with tsx'",
-    "start": "tsx server.ts",
+    "start": "tsx app.ts",
     "railway": "npm start",
     "test": "curl http://localhost:3000/api/health"
   },

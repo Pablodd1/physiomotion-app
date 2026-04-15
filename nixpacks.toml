@@ -8,4 +8,4 @@ nixpkgsArchive = "bc3950f3c94d09634ad78345b427c3df6a3e349b"
 nodejs = "20"
 
 [start]
-cmd = "npx tsx server.ts"
+cmd = "npx tsx app.ts"

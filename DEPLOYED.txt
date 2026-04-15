@@ -1,0 +1,4 @@
+DEPLOYED
+
+App file: app.ts
+All endpoints working including dashboard/stats
