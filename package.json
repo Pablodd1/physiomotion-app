@@ -5,37 +5,27 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "tsc && npm run copy-static",
-    "copy-static": "cp -r public dist/ 2>/dev/null || echo 'No public dir to copy'",
-    "start": "node dist/server.js",
-    "railway": "npm run build && npm start",
-    "preview": "npm run build && npm start",
-    "test": "curl http://localhost:3000/api/health",
-    "tsc": "tsc",
-    "postinstall": "npm run build"
+    "build": "echo 'No build needed - runs directly with tsx'",
+    "start": "tsx server.ts",
+    "railway": "npm start",
+    "test": "curl http://localhost:3000/api/health"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",
     "@hono/node-server": "^1.13.8",
-    "@types/pg": "^8.20.0",
     "bcryptjs": "^2.4.3",
     "hono": "^4.10.1",
-    "pg": "^8.20.0",
-    "tailwindcss": "^3.4.0",
     "three": "^0.160.0",
     "tsx": "^4.19.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250705.0",
-    "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.2",
-    "@tailwindcss/vite": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.2.1",
     "@types/three": "^0.160.0",
-    "typescript": "^5.0.0",
-    "vite": "^6.3.5",
-    "wrangler": "^4.4.0"
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
