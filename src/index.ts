@@ -465,6 +465,7 @@ app.post('/api/exercise-sessions', async (c) => {
 
 // Get dashboard stats
 app.get('/api/dashboard/stats', (c) => {
+  console.log('[PHYSIOMOTION] Dashboard stats endpoint hit');
   const stats = {
     total_patients: MOCK_PATIENTS.length,
     active_patients: MOCK_PATIENTS.filter(p => {
