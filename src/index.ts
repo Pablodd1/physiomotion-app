@@ -22,6 +22,7 @@ app.get('/api/health', (c) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     version: '2.0.0-demo',
+    commit: 'c8dd9fe',
     features: {
       patients: true,
       assessments: true,
