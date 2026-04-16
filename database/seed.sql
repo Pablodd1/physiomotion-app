@@ -11,7 +11,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Strengthens the rotator cuff muscles, particularly the external rotators, which are crucial for shoulder stability.',
 '1. Anchor resistance band at elbow height\n2. Stand with elbow tucked at side, forearm across belly\n3. Rotate forearm outward against band resistance\n4. Keep elbow fixed at side\n5. Return slowly to starting position',
 'Secure band to stable object at elbow level. Stand perpendicular to anchor point.',
-'Keep elbow tucked • Control the movement • Don\'t let shoulder hike up',
+'Keep elbow tucked • Control the movement • Don''t let shoulder hike up',
 'Acute shoulder impingement, recent shoulder surgery without clearance',
 '["resistance_band"]', 300, 3, 15, NULL, '["rotator cuff", "shoulder stability", "posture"]', '["97110"]', true),
 
@@ -27,7 +27,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Targets the supraspinatus muscle in a functional plane of shoulder movement.',
 '1. Stand with arms at sides, thumbs pointing down\n2. Raise arms diagonally (30° forward of frontal plane)\n3. Lift to shoulder height\n4. Lower slowly with control',
 'Stand tall with core engaged. Use light weights (1-3 lbs initially).',
-'Thumbs down • Lead with pinky finger • Don\'t shrug shoulders',
+'Thumbs down • Lead with pinky finger • Don''t shrug shoulders',
 'Shoulder impingement syndrome, acute rotator cuff tear',
 '["dumbbells", "light_weights"]', 240, 3, 12, NULL, '["supraspinatus", "shoulder elevation"]', '["97110"]', true),
 
@@ -35,7 +35,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Improves overhead shoulder mobility and scapular upward rotation.',
 '1. Stand with back against wall\n2. Place arms in "W" position against wall\n3. Slowly slide arms up to "Y" position\n4. Keep lower back flat against wall\n5. Return to starting position',
 'Use a towel behind head if needed to maintain contact.',
-'Keep wrists and elbows on wall • Don\'t arch lower back • Breathe steadily',
+'Keep wrists and elbows on wall • Don''t arch lower back • Breathe steadily',
 'Frozen shoulder in acute phase, severe kyphosis',
 '["wall", "towel"]', 180, 2, 10, NULL, '["overhead mobility", "posture", "scapular control"]', '["97110"]', true),
 
@@ -51,7 +51,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Activates serratus anterior for scapular protraction and upward rotation.',
 '1. Stand arm length from wall\n2. Place hands on wall at shoulder height\n3. Perform push-up motion\n4. At end range, push further to round upper back\n5. Hold protraction for 2 seconds',
 'Stand close enough that elbows bend to 90°.',
-'Focus on shoulder blade movement • Keep core tight • Don\'t lock elbows',
+'Focus on shoulder blade movement • Keep core tight • Don''t lock elbows',
 'Wrist pain, severe shoulder weakness',
 '["wall"]', 240, 3, 15, NULL, '["serratus anterior", "push-up progression"]', '["97110"]', true),
 
@@ -59,7 +59,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Stretches the posterior shoulder capsule and rotator cuff.',
 '1. Bring arm across chest at shoulder height\n2. Use opposite hand to gently pull arm closer\n3. Feel stretch in back of shoulder\n4. Hold 30 seconds\n5. Repeat on other side',
 'Sit or stand with good posture.',
-'Keep shoulder down • Don\'t force the stretch • Breathe deeply',
+'Keep shoulder down • Don''t force the stretch • Breathe deeply',
 'Acute shoulder pain, posterior instability',
 '["none"]', 120, 2, 1, 30, '["posterior capsule", "shoulder stretch"]', '["97140"]', true),
 
@@ -67,7 +67,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Stretches the posterior shoulder capsule, important for overhead athletes.',
 '1. Lie on side with bottom arm out front, elbow bent 90°\n2. Use top hand to gently push forearm down toward floor\n3. Keep shoulder blades together\n4. Feel stretch in back of shoulder\n5. Hold 30 seconds',
 'Lie on firm surface. Keep elbow at shoulder height.',
-'Don\'t force rotation • Keep elbow flexed • Stop if painful',
+'Don''t force rotation • Keep elbow flexed • Stop if painful',
 'Shoulder instability, recent surgery',
 '["floor_mat"]', 90, 2, 1, 30, '["posterior capsule", "glenohumeral mobility"]', '["97140"]', true),
 
@@ -75,7 +75,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Stretches tight chest muscles that contribute to rounded shoulder posture.',
 '1. Stand in doorway with forearms on door frame\n2. Elbows at shoulder height, bent 90°\n3. Step forward gently to feel chest stretch\n4. Hold 30 seconds',
 'Adjust arm height to stretch different portions of pec.',
-'Keep head up • Don\'t lean forward • Breathe into the stretch',
+'Keep head up • Don''t lean forward • Breathe into the stretch',
 'Shoulder impingement with anterior pain',
 '["doorway"]', 90, 2, 1, 30, '["pec stretch", "posture", "rounded shoulders"]', '["97140"]', true),
 
@@ -95,7 +95,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Stretches the wrist and finger flexor muscles.',
 '1. Extend arm straight out, palm up\n2. Use other hand to gently pull fingers back\n3. Feel stretch in forearm\n4. Hold 30 seconds\n5. Repeat on other side',
 'Keep elbow straight throughout.',
-'Keep shoulder down • Gently pull • Don\'t force',
+'Keep shoulder down • Gently pull • Don''t force',
 'Acute wrist sprain, recent fracture',
 '["none"]', 90, 2, 1, 30, '["wrist flexibility", "forearm stretch"]', '["97140"]', true),
 
@@ -119,9 +119,9 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Eccentric strengthening for wrist flexors.',
 '1. Support forearm on table, palm up\n2. Use other hand to lift wrist into flexion\n3. Slowly lower back down (3-5 seconds)\n4. Repeat 15 times',
 'Start with no weight, progress gradually.',
-'Control the lowering • Don\'t rush • Breathe steadily',
+'Control the lowering • Don''t rush • Breathe steadily',
 'Acute wrist sprain',
-'["dumbbell", "table"]', 180, 3, 15, NULL, '["golfer\'s elbow", "wrist strengthening"]', '["97110"]', true),
+'["dumbbell", "table"]', 180, 3, 15, NULL, '["golfer''s elbow", "wrist strengthening"]', '["97110"]', true),
 
 ('Pronation/Supination', 'strength', 'upper_body', '["supinator", "pronator teres", "biceps"]', '["elbow", "forearm"]', '["pronation", "supination"]', 'beginner',
 'Improves forearm rotation strength and mobility.',
@@ -135,7 +135,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Basic elbow flexion strengthening.',
 '1. Stand with arms at sides, palms forward\n2. Curl weights toward shoulders\n3. Keep elbows at sides\n4. Lower slowly to start position',
 'Stand or sit with good posture.',
-'Don\'t swing body • Control the lowering • Full range',
+'Don''t swing body • Control the lowering • Full range',
 'Biceps tendonitis (acute), elbow pain',
 '["dumbbells"]', 240, 3, 12, NULL, '["biceps", "elbow flexion"]', '["97110"]', true),
 
@@ -143,7 +143,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Strengthens the triceps muscle for elbow extension.',
 '1. Hold weight overhead with both hands\n2. Lower weight behind head by bending elbows\n3. Keep upper arms close to ears\n4. Extend arms back to start',
 'Sit or stand with core engaged.',
-'Keep elbows pointing up • Don\'t flare out • Control movement',
+'Keep elbows pointing up • Don''t flare out • Control movement',
 'Elbow arthritis, triceps tendinopathy',
 '["dumbbell"]', 240, 3, 12, NULL, '["triceps", "elbow extension"]', '["97110"]', true),
 
@@ -155,7 +155,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Activates deep hip external rotators important for pelvic stability.',
 '1. Lie on side with hips and knees bent, feet together\n2. Keep feet touching, open top knee like a clamshell\n3. Lift until hip begins to rotate\n4. Lower slowly back down',
 'Use resistance band around knees for progression.',
-'Keep hips stacked • Don\'t roll backward • Feel it in side of hip',
+'Keep hips stacked • Don''t roll backward • Feel it in side of hip',
 'Greater trochanteric bursitis (aggravated)',
 '["resistance_band", "none"]', 180, 3, 15, NULL, '["glute medius", "hip stability", "knee valgus"]', '["97110"]', true),
 
@@ -163,7 +163,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Strengthens hip abductors for pelvic stability and knee alignment.',
 '1. Lie on side, bottom knee bent for stability\n2. Keep top leg straight, toe pointed slightly down\n3. Lift leg up toward ceiling\n4. Lower with control',
 'Maintain neutral spine throughout.',
-'Toe pointed down • Don\'t flex hip • Control the lowering',
+'Toe pointed down • Don''t flex hip • Control the lowering',
 'None significant',
 '["none"]', 180, 3, 15, NULL, '["hip abductors", "pelvic stability"]', '["97110"]', true),
 
@@ -171,7 +171,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Fundamental glute strengthening exercise for hip extension.',
 '1. Lie on back, knees bent, feet flat\n2. Engage core, squeeze glutes\n3. Lift hips until knees, hips, shoulders align\n4. Hold 2-3 seconds\n5. Lower slowly',
 'Feet shoulder-width apart, close to hips.',
-'Squeeze glutes at top • Don\'t arch low back • Push through heels',
+'Squeeze glutes at top • Don''t arch low back • Push through heels',
 'Acute low back pain, hip flexor strain',
 '["none"]', 180, 3, 15, NULL, '["glutes", "bridge", "hip extension"]', '["97110"]', true),
 
@@ -186,8 +186,8 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 ('Hip Flexor Stretch (Half-Kneeling)', 'flexibility', 'lower_body', '["iliopsoas", "rectus femoris"]', '["hip"]', '["extension"]', 'beginner',
 'Stretches tight hip flexors common in seated populations.',
 '1. Kneel on one knee, other foot forward\n2. Tuck pelvis under (posterior tilt)\n3. Lean forward slightly\n4. Feel stretch in front of hip\n5. Hold 30 seconds, switch sides',
-'Ensure front knee doesn\'t pass toes.',
-'Squeeze glutes • Tuck tailbone • Don\'t arch back',
+'Ensure front knee doesn''t pass toes.',
+'Squeeze glutes • Tuck tailbone • Don''t arch back',
 'Acute hip flexor strain, knee pain',
 '["none", "pad"]', 120, 2, 1, 30, '["hip flexors", "anterior hip", "sitting"]', '["97140"]', true),
 
@@ -203,7 +203,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Deep stretch for posterior hip and gluteal muscles.',
 '1. Start in plank position\n2. Bring one knee forward, angled outward\n3. Extend other leg straight back\n4. Lower upper body toward floor\n5. Hold 30 seconds, switch sides',
 'Use yoga blocks for support if needed.',
-'Square hips • Breathe deeply • Don\'t force',
+'Square hips • Breathe deeply • Don''t force',
 'Knee pain, hip impingement',
 '["yoga_block"]', 90, 2, 1, 30, '["glute stretch", "hip opener", "piriformis"]', '["97140"]', true),
 
@@ -219,7 +219,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Functional standing exercise for hip abductor strength.',
 '1. Stand tall, hold onto stable surface\n2. Lift leg out to side without leaning\n3. Keep toes pointing forward\n4. Lower slowly\n5. Complete set, switch sides',
 'Maintain upright posture throughout.',
-'Don\'t lean • Keep movement controlled • Feel side of hip',
+'Don''t lean • Keep movement controlled • Feel side of hip',
 'Severe balance deficits, acute hip pain',
 '["chair", "counter"]', 180, 3, 15, NULL, '["hip abductors", "standing", "functional"]', '["97110"]', true),
 
@@ -227,7 +227,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Lateral walking exercise with band resistance for hip stability.',
 '1. Place resistance band around ankles or knees\n2. Assume athletic stance (slight squat)\n3. Step sideways while maintaining tension\n4. Keep feet at least shoulder-width apart\n5. Walk 10 steps each direction',
 'Maintain level hips throughout movement.',
-'Stay low • Keep band taut • Don\'t let knees cave',
+'Stay low • Keep band taut • Don''t let knees cave',
 'Knee pain, severe hip weakness',
 '["resistance_band"]', 240, 3, 10, NULL, '["lateral movement", "hip stability", "glute activation"]', '["97110"]', true),
 
@@ -247,7 +247,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Early phase knee exercise to maintain quadriceps activation.',
 '1. Lie on back, one knee bent, target leg straight\n2. Tighten thigh muscle to lock knee\n3. Lift leg 12-18 inches\n4. Hold 2-3 seconds\n5. Lower slowly',
 'Ensure knee stays fully straight throughout.',
-'Lock the knee • Small controlled movement • Don\'t hold breath',
+'Lock the knee • Small controlled movement • Don''t hold breath',
 'Acute knee injury, unable to straighten knee',
 '["none"]', 180, 3, 15, NULL, '["quad activation", "early phase", "knee surgery"]', '["97110"]', true),
 
@@ -339,7 +339,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Core stabilization exercise emphasizing neutral spine maintenance.',
 '1. Lie on back, arms up, knees bent 90°\n2. Press low back into floor\n3. Slowly lower one arm and opposite leg\n4. Do not let back arch\n5. Return to start, alternate sides',
 'Ensure low back stays flat throughout.',
-'Belly button to spine • Don\'t arch • Move slowly',
+'Belly button to spine • Don''t arch • Move slowly',
 'Acute disc herniation with leg symptoms',
 '["none"]', 180, 3, 10, NULL, '["core stability", "anti-extension", "neutral spine"]', '["97110"]', true),
 
@@ -347,7 +347,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Quadruped core stabilization with opposite arm/leg extension.',
 '1. Start on hands and knees\n2. Tighten core muscles\n3. Extend one arm and opposite leg\n4. Keep hips and shoulders level\n5. Hold 5-10 seconds, return, alternate',
 'Maintain neutral spine throughout.',
-'Don\'t let hips rotate • Reach long • Hold steady',
+'Don''t let hips rotate • Reach long • Hold steady',
 'Acute spinal instability, severe shoulder pain',
 '["none"]', 240, 3, 8, 5, '["core stability", "anti-rotation", "spine"]', '["97110"]', true),
 
@@ -355,7 +355,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Fundamental isometric core strengthening exercise.',
 '1. Start in push-up position or on forearms\n2. Keep body in straight line from head to heels\n3. Engage core, squeeze glutes\n4. Hold for specified time\n5. Breathe normally throughout',
 'Start with knees down if needed.',
-'Flat back • Don\'t let hips sag • Breathe',
+'Flat back • Don''t let hips sag • Breathe',
 'Acute low back pain, shoulder pain',
 '["none"]', 60, 3, 1, 30, '["plank", "isometric", "core endurance"]', '["97110"]', true),
 
@@ -363,7 +363,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Lateral core stability exercise.',
 '1. Lie on side, forearm under shoulder\n2. Stack feet or stagger for balance\n3. Lift hips off floor\n4. Keep body in straight line\n5. Hold, then switch sides',
 'Start with knees bent for modification.',
-'Keep hips up • Straight line • Don\'t hold breath',
+'Keep hips up • Straight line • Don''t hold breath',
 'Shoulder pain, lateral hip pain',
 '["none"]', 60, 3, 1, 30, '["side plank", "obliques", "lateral stability"]', '["97110"]', true),
 
@@ -371,7 +371,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Anti-rotation core exercise using band or cable resistance.',
 '1. Stand perpendicular to band anchor\n2. Hold band at chest with elbows bent\n3. Press arms straight out\n4. Resist rotation toward band\n5. Return to chest, repeat',
 'Step farther from anchor for more resistance.',
-'Keep hips square • Don\'t rotate • Control movement',
+'Keep hips square • Don''t rotate • Control movement',
 'Severe balance issues, acute shoulder pain',
 '["resistance_band", "cable_machine"]', 240, 3, 12, NULL, '["anti-rotation", "obliques", "core stability"]', '["97110"]', true),
 
@@ -403,7 +403,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Fundamental activation of deep core stabilizers.',
 '1. Lie on back with knees bent\n2. Gently draw belly button toward spine\n3. Tighten muscles as if preparing for a cough\n4. Hold contraction 10 seconds\n5. Release and repeat',
 'Do not hold breath.',
-'30% effort • Breathe normally • Don\'t hollow',
+'30% effort • Breathe normally • Don''t hollow',
 'Acute abdominal pain, recent abdominal surgery',
 '["none"]', 120, 3, 5, 10, '["bracing", "core activation", "TVA"]', '["97110"]', true),
 
@@ -411,7 +411,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Draws in abdominal wall to activate transverse abdominis.',
 '1. Lie on back with knees bent\n2. Gently pull navel toward spine\n3. Imagine narrowing waistline\n4. Hold 10 seconds\n5. Release and repeat',
 'Do not lift chest or tilt pelvis.',
-'Gentle contraction • Keep breathing • Don\'t move spine',
+'Gentle contraction • Keep breathing • Don''t move spine',
 'None significant',
 '["none"]', 120, 3, 5, 10, '["hollowing", "TVA", "deep core"]', '["97110"]', true),
 
@@ -439,13 +439,13 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Dynamic single-leg balance with multi-planar reach.',
 '1. Stand on one leg with slight knee bend\n2. Reach opposite hand toward floor in front\n3. Return to standing\n4. Reach to side\n5. Reach behind\n6. Complete all directions, switch legs',
 'Start with small reaches, progress range.',
-'Control the reach • Keep knee aligned • Don\'t let hip hike',
+'Control the reach • Keep knee aligned • Don''t let hip hike',
 'Severe balance deficits, knee instability',
 '["none"]', 240, 3, 6, NULL, '["star excursion", "dynamic balance", "reach"]', '["97110"]', true),
 
 ('Clock Reaches', 'balance', 'lower_body', '["hip stabilizers", "ankle stabilizers"]', '["hip", "ankle"]', '["balance", "reaching"]', 'intermediate',
 'Multi-directional balance exercise in single-leg stance.',
-'1. Stand on one leg in center of "clock"\n2. Tap floor at 12 o\'clock with opposite foot\n3. Return to center\n4. Continue around clock (12, 1, 2, 3, etc.)\n5. Complete circle, switch legs',
+'1. Stand on one leg in center of "clock"\n2. Tap floor at 12 o''clock with opposite foot\n3. Return to center\n4. Continue around clock (12, 1, 2, 3, etc.)\n5. Complete circle, switch legs',
 'Imagine standing in middle of clock face.',
 'Small controlled movements • Stay balanced • Complete the circle',
 'Patellar instability, severe ankle sprain',
@@ -455,7 +455,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Unstable surface squat for advanced balance training.',
 '1. Stand on BOSU dome or flat side\n2. Feet shoulder-width apart\n3. Squat down with control\n4. Keep balance throughout\n5. Return to standing',
 'Start with dome side up (easier).',
-'Slow controlled • Find balance point • Don\'t rush',
+'Slow controlled • Find balance point • Don''t rush',
 'Severe balance deficits, acute injury',
 '["bosu_ball"]', 240, 3, 10, NULL, '["unstable surface", "balance", "squat"]', '["97110"]', true);
 
@@ -484,7 +484,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Single-leg alternating bridge for hip stability.',
 '1. Lie on back, knees bent\n2. Lift hips to bridge position\n3. Lift one knee toward chest\n4. Lower with control, switch legs\n5. Keep hips level throughout',
 'Maintain hip height during marching.',
-'Don\'t let hips drop • Keep core engaged • Alternate smoothly',
+'Don''t let hips drop • Keep core engaged • Alternate smoothly',
 'Sacroiliac pain, hamstring strain',
 '["none"]', 240, 3, 10, NULL, '["bridge", "march", "hip stability"]', '["97110"]', true),
 
@@ -534,7 +534,7 @@ INSERT INTO exercises (exercise_name, exercise_category, body_region, target_mus
 'Functional grip and core endurance exercise.',
 '1. Stand holding weights at sides\n2. Pull shoulders back and down\n3. Walk with control, upright posture\n4. Maintain grip and posture\n5. Walk specified distance or time',
 'Choose challenging but manageable weight.',
-'Shoulders down • Walk tall • Don\'t let weight swing',
+'Shoulders down • Walk tall • Don''t let weight swing',
 'Severe grip weakness, balance issues',
 '["dumbbells", "kettlebells"]', 120, 3, 1, 45, '["grip", "carry", "functional"]', '["97110"]', true),
 

@@ -2,613 +2,750 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Assessment - PhysioMotion</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MSK Assessment - PhysioMotion</title>
+    <meta name="description" content="Medical-grade musculoskeletal assessment with AI-powered joint tracking">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .sidebar { background: #1f2937; min-height: 100vh; }
-        .camera-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
-        .camera-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
-        .quality-indicator { position: absolute; top: 16px; right: 16px; padding: 8px 16px; border-radius: 20px; font-weight: 600; }
-        .quality-good { background: rgba(16, 185, 129, 0.9); color: white; }
-        .quality-poor { background: rgba(239, 68, 68, 0.9); color: white; }
-        .quality-fair { background: rgba(245, 158, 11, 0.9); color: white; }
-        .joint-marker { position: absolute; width: 12px; height: 12px; background: #10b981; border-radius: 50%; transform: translate(-50%, -50%); }
-        .skeleton-line { position: absolute; background: #10b981; transform-origin: left center; height: 3px; }
-        .angle-display { position: absolute; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-        #canvas-output { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .metric-card { background: white; border-radius: 8px; padding: 12px; border: 1px solid #e5e7eb; }
-        .metric-value { font-size: 24px; font-weight: 700; color: #1f2937; }
-        .metric-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
-        .exercise-btn { transition: all 0.2s; }
-        .exercise-btn:hover { transform: translateX(4px); }
-        .exercise-btn.active { background: #e0e7ff; border-left: 4px solid #6366f1; }
-        .recording-dot { animation: pulse-red 1s infinite; }
-        @keyframes pulse-red {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        :root {
+            --bg: #0a0e1a;
+            --surface: #111827;
+            --surface2: #1a2235;
+            --border: rgba(255,255,255,0.07);
+            --cyan: #00e5ff;
+            --green: #00e676;
+            --amber: #ffab00;
+            --red: #ff1744;
+            --purple: #7c4dff;
+            --text: #eceff1;
+            --muted: #607d8b;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+        /* Layout */
+        .app { display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--surface); flex-shrink: 0; }
+        .content { flex: 1; display: grid; grid-template-columns: 1fr 300px; gap: 0; overflow: hidden; }
+
+        /* Sidebar */
+        .logo { padding: 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--cyan), var(--purple)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .logo-text h1 { font-size: 14px; font-weight: 700; }
+        .logo-text p { font-size: 10px; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+        .nav { flex: 1; padding: 12px 8px; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-decoration: none; margin-bottom: 2px; }
+        .nav-item:hover { background: var(--surface2); color: var(--text); }
+        .nav-item.active { background: rgba(0,229,255,0.1); color: var(--cyan); }
+        .nav-item i { width: 16px; text-align: center; font-size: 13px; }
+
+        /* Topbar */
+        .patient-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .patient-badge select { background: transparent; border: none; color: var(--text); font-family: inherit; font-size: 13px; outline: none; cursor: pointer; }
+        .status-pill { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
+        .status-pill.ready { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+        .status-pill.recording { background: rgba(255,23,68,0.15); color: var(--red); border: 1px solid rgba(255,23,68,0.3); animation: pulse 1s infinite; }
+        .status-pill.analyzing { background: rgba(0,229,255,0.15); color: var(--cyan); border: 1px solid rgba(0,229,255,0.3); }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .ml-auto { margin-left: auto; }
+
+        /* Camera area */
+        .camera-area { position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content:: center; }
+        #videoEl { width: 100%; height: 100%; object-fit: cover; display: block; }
+        #canvasEl { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* Setup overlay */
+        .setup-overlay { position: absolute; inset: 0; background: rgba(10,14,26,0.95); display: flex; align-items: center; justify-content: center; z-index: 10; }
+        .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 480px; max-width: 90vw; }
+        .setup-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .setup-card p { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+        .camera-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .cam-opt { border: 2px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .cam-opt:hover { border-color: rgba(0,229,255,0.4); background: rgba(0,229,255,0.05); }
+        .cam-opt.selected { border-color: var(--cyan); background: rgba(0,229,255,0.1); }
+        .cam-opt i { font-size: 24px; color: var(--cyan); margin-bottom: 8px; display: block; }
+        .cam-opt h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .cam-opt p { font-size: 11px; color: var(--muted); margin: 0; }
+
+        /* Controls bar */
+        .controls-bar { background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-primary { background: var(--cyan); color: #000; }
+        .btn-primary:hover:not(:disabled) { background: #26eaff; transform: translateY(-1px); }
+        .btn-danger { background: var(--red); color: #fff; }
+        .btn-danger:hover:not(:disabled) { background: #ff4569; }
+        .btn-success { background: var(--green); color: #000; }
+        .btn-success:hover:not(:disabled) { background: #33eb91; }
+        .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+        .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+        .btn-ghost.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,0.1); }
+        .rec-time { font-size: 13px; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; }
+
+        /* Right panel */
+        .panel { background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .panel-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .tab { flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+        .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+        .panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+        .panel-body::-webkit-scrollbar { width: 4px; }
+        .panel-body::-webkit-scrollbar-track { background: transparent; }
+        .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Joint table */
+        .joint-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 6px; margin-bottom: 3px; background: var(--surface2); font-size: 12px; }
+        .joint-name { color: var(--muted); font-weight: 500; flex: 1; }
+        .joint-angle { font-weight: 700; font-size: 14px; min-width: 40px; text-align: right; }
+        .badge { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; margin-left: 6px; }
+        .badge-normal { background: rgba(0,230,118,0.15); color: var(--green); }
+        .badge-limited { background: rgba(255,171,0,0.15); color: var(--amber); }
+        .badge-excessive { background: rgba(255,23,68,0.15); color: var(--red); }
+        .badge-occluded { background: rgba(96,125,139,0.15); color: var(--muted); }
+
+        /* ROM bars */
+        .rom-row { margin-bottom: 10px; }
+        .rom-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+        .rom-label span:first-child { color: var(--muted); }
+        .rom-label span:last-child { font-weight: 700; color: var(--text); }
+        .rom-bar-bg { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+        .rom-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+        /* Compensation alerts */
+        .comp-alert { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 11px; line-height: 1.4; }
+        .comp-alert.severe { background: rgba(255,23,68,0.12); border-left: 3px solid var(--red); }
+        .comp-alert.moderate { background: rgba(255,109,0,0.12); border-left: 3px solid #ff6d00; }
+        .comp-alert.mild { background: rgba(255,171,0,0.12); border-left: 3px solid var(--amber); }
+        .comp-alert i { margin-top: 1px; flex-shrink: 0; }
+
+        /* Results panel */
+        .results-section { margin-bottom: 16px; }
+        .results-section h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+        .score-circle { width: 80px; height: 80px; border-radius: 50%; border: 4px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 12px; }
+        .score-circle .score-num { font-size: 24px; font-weight: 800; }
+        .score-circle .score-label { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+
+        /* Exercise list */
+        .ex-item { padding: 8px 10px; border-radius: 6px; background: var(--surface2); margin-bottom: 4px; cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; font-size: 12px; }
+        .ex-item:hover { background: rgba(255,255,255,0.05); }
+        .ex-item.selected { border-left-color: var(--cyan); background: rgba(0,229,255,0.08); }
+        .ex-item .ex-name { font-weight: 600; margin-bottom: 2px; }
+        .ex-item .ex-meta { font-size: 10px; color: var(--muted); }
+
+        /* Loading spinner */
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,229,255,0.3); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .content { grid-template-columns: 1fr; }
+            .panel { display: none; }
+            .panel.mobile-show { display: flex; position: fixed; inset: 0; z-index: 50; }
+        }
+
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-100">
-    <div class="flex">
-        <!-- Sidebar -->
-        <div class="sidebar w-64 text-white">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center mr-3">
-                        <i class="fas fa-heartbeat"></i>
-                    </div>
-                    <div>
-                        <h1 class="font-bold text-lg">PhysioMotion</h1>
-                        <p class="text-xs text-gray-400">Medical Grade</p>
-                    </div>
-                </div>
+<body>
+<div class="app">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">🦴</div>
+            <div class="logo-text">
+                <h1>PhysioMotion</h1>
+                <p>Medical Grade</p>
             </div>
+        </div>
+        <nav class="nav">
+            <a href="/dashboard.html" class="nav-item"><i class="fas fa-home"></i> Dashboard</a>
+            <a href="/patients.html" class="nav-item"><i class="fas fa-users"></i> Patients</a>
+            <a href="/assessment.html" class="nav-item active"><i class="fas fa-video"></i> Assessment</a>
+            <a href="/exercises.html" class="nav-item"><i class="fas fa-dumbbell"></i> Exercises</a>
+        </nav>
+    </div>
 
-            <nav class="mt-6">
-                <a href="/dashboard" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
-                    <i class="fas fa-home w-6"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="/patients" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
-                    <i class="fas fa-users w-6"></i>
-                    <span>Patients</span>
-                </a>
-                <a href="/assessment" class="flex items-center px-6 py-3 bg-gray-800 border-l-4 border-indigo-500">
-                    <i class="fas fa-video w-6"></i>
-                    <span>New Assessment</span>
-                </a>
-                <a href="/exercises" class="flex items-center px-6 py-3 hover:bg-gray-700 transition">
-                    <i class="fas fa-dumbbell w-6"></i>
-                    <span>Exercise Library</span>
-                </a>
-            </nav>
+    <!-- Main -->
+    <div class="main">
+        <!-- Topbar -->
+        <div class="topbar">
+            <div class="patient-badge">
+                <i class="fas fa-user-injured" style="color:var(--muted);font-size:12px"></i>
+                <select id="patientSelect" onchange="onPatientChange(this.value)">
+                    <option value="">Select Patient...</option>
+                </select>
+            </div>
+            <div class="patient-badge">
+                <i class="fas fa-dumbbell" style="color:var(--muted);font-size:12px"></i>
+                <select id="exerciseSelect" onchange="onExerciseChange(this.value)">
+                    <option value="">Select Exercise...</option>
+                </select>
+            </div>
+            <span id="statusPill" class="status-pill ready">READY</span>
+            <div class="ml-auto" style="display:flex;align-items:center;gap:8px">
+                <span id="perfInfo" style="font-size:11px;color:var(--muted)"></span>
+                <button class="btn btn-ghost" onclick="openMobilePanel()" style="display:none" id="mobilePanelBtn">
+                    <i class="fas fa-chart-bar"></i>
+                </button>
+            </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="flex-1 p-6">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Video Assessment</h1>
-                    <p class="text-gray-600">Record and analyze patient movement with AI-powered pose detection</p>
+        <!-- Content grid -->
+        <div class="content">
+            <!-- Camera + controls -->
+            <div style="display:flex;flex-direction:column;overflow:hidden">
+                <!-- Camera area -->
+                <div class="camera-area" style="flex:1">
+                    <video id="videoEl" autoplay playsinline muted></video>
+                    <canvas id="canvasEl"></canvas>
+
+                    <!-- Setup overlay -->
+                    <div class="setup-overlay" id="setupOverlay">
+                        <div class="setup-card">
+                            <h2>Start MSK Assessment</h2>
+                            <p>Select camera source and exercise, then begin tracking.</p>
+
+                            <div class="camera-options">
+                                <div class="cam-opt" id="opt-webcam" onclick="selectCamera('webcam')">
+                                    <i class="fas fa-laptop"></i>
+                                    <h3>Laptop Camera</h3>
+                                    <p>Built-in or USB webcam</p>
+                                </div>
+                                <div class="cam-opt" id="opt-phone" onclick="selectCamera('phone')">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <h3>Mobile Phone</h3>
+                                    <p>Rear camera recommended</p>
+                                </div>
+                            </div>
+
+                            <div id="setupTips" style="font-size:12px;color:var(--muted);padding:10px;background:var(--surface2);border-radius:8px;margin-bottom:16px;display:none">
+                                <strong style="color:var(--text)">Setup Tips:</strong>
+                                <ul id="tipsList" style="margin-top:6px;padding-left:16px;line-height:1.7"></ul>
+                            </div>
+
+                            <button id="startBtn" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="launchCamera()" disabled>
+                                <span class="spinner hidden" id="startSpinner"></span>
+                                <i class="fas fa-video" id="startIcon"></i>
+                                Start Camera & Tracking
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <select id="patientSelect" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                        <option value="">Select Patient...</option>
-                    </select>
-                    <button onclick="window.location.href='/dashboard'" class="px-4 py-2 text-gray-600 hover:text-gray-800">
-                        <i class="fas fa-times"></i>
+
+                <!-- Controls bar -->
+                <div class="controls-bar">
+                    <button id="recordBtn" class="btn btn-danger" onclick="startRecording()" disabled>
+                        <i class="fas fa-circle"></i> Record
                     </button>
+                    <button id="stopBtn" class="btn btn-ghost hidden" onclick="stopRecording()">
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                    <span id="recTime" class="rec-time hidden">00:00</span>
+                    <button id="analyzeBtn" class="btn btn-success hidden" onclick="analyzeAndShowResults()">
+                        <i class="fas fa-brain"></i> Analyze
+                    </button>
+
+                    <div class="ml-auto" style="display:flex;gap:8px">
+                        <button id="toggleAngles" class="btn btn-ghost active" onclick="toggleOverlay('angles', this)" title="Toggle angle labels">
+                            <i class="fas fa-ruler-combined"></i>
+                        </button>
+                        <button id="toggleROM" class="btn btn-ghost active" onclick="toggleOverlay('rom', this)" title="Toggle ROM panel">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
+                        <button id="toggleComp" class="btn btn-ghost active" onclick="toggleOverlay('comp', this)" title="Toggle compensation alerts">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </button>
+                        <button id="flipBtn" class="btn btn-ghost hidden" onclick="flipCamera()" title="Flip camera">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="btn btn-ghost" onclick="resetSession()" title="New assessment">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Left Column: Exercise Selection -->
-                <div class="lg:col-span-1">
-                    <div class="bg-white rounded-lg shadow mb-6">
-                        <div class="p-4 border-b border-gray-200">
-                            <h2 class="font-bold text-gray-800">Select Exercise</h2>
-                        </div>
-                        <div id="exerciseList" class="max-h-64 overflow-y-auto">
-                            <!-- Exercises loaded dynamically -->
-                            <div class="p-4 text-center text-gray-500">
-                                <i class="fas fa-spinner fa-spin"></i> Loading...
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <h3 class="font-bold text-gray-800 mb-3">Assessment Settings</h3>
-                        <div class="space-y-3">
-                            <label class="flex items-center">
-                                <input type="checkbox" id="showSkeleton" checked class="mr-2">
-                                Show Skeleton
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" id="showAngles" checked class="mr-2">
-                                Show Joint Angles
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" id="recordVideo" class="mr-2">
-                                Record Video
-                            </label>
-                        </div>
-                    </div>
+            <!-- Right panel -->
+            <div class="panel" id="rightPanel">
+                <div class="panel-tabs">
+                    <div class="tab active" onclick="switchTab('joints', this)">Joints</div>
+                    <div class="tab" onclick="switchTab('rom', this)">ROM</div>
+                    <div class="tab" onclick="switchTab('results', this)">Results</div>
                 </div>
-
-                <!-- Center: Camera Feed -->
-                <div class="lg:col-span-2">
-                    <div class="camera-container aspect-video mb-4">
-                        <video id="input-video" class="w-full h-full object-cover" playsinline></video>
-                        <canvas id="output-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
-                        
-                        <!-- Quality Indicator -->
-                        <div id="qualityIndicator" class="quality-indicator quality-poor">
-                            <i class="fas fa-circle text-xs mr-2"></i>
-                            <span>Initializing...</span>
-                        </div>
-
-                        <!-- Recording Indicator -->
-                        <div id="recordingIndicator" class="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full hidden">
-                            <i class="fas fa-circle recording-dot mr-2"></i>
-                            REC <span id="recordingTime">00:00</span>
-                        </div>
-
-                        <!-- Camera Controls Overlay -->
-                        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-3">
-                            <button id="startCameraBtn" onclick="startCamera()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full flex items-center">
-                                <i class="fas fa-video mr-2"></i>Start Camera
-                            </button>
-                            <button id="stopCameraBtn" onclick="stopCamera()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full hidden">
-                                <i class="fas fa-stop mr-2"></i>Stop
-                            </button>
-                            <button id="captureBtn" onclick="captureFrame()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full hidden">
-                                <i class="fas fa-camera mr-2"></i>Capture
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Real-time Metrics -->
-                    <div id="metricsPanel" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div class="metric-card">
-                            <p class="metric-label">FPS</p>
-                            <p id="fpsMetric" class="metric-value">--</p>
-                        </div>
-                        <div class="metric-card">
-                            <p class="metric-label">Detection</p>
-                            <p id="detectionMetric" class="metric-value">--</p>
-                        </div>
-                        <div class="metric-card">
-                            <p class="metric-label">Knee Angle</p>
-                            <p id="kneeAngleMetric" class="metric-value">--</p>
-                        </div>
-                        <div class="metric-card">
-                            <p class="metric-label">Hip Angle</p>
-                            <p id="hipAngleMetric" class="metric-value">--</p>
-                        </div>
-                    </div>
-
-                    <!-- Assessment Controls -->
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-gray-800">Assessment Controls</h3>
-                            <span id="selectedExercise" class="text-sm text-indigo-600 font-medium">No exercise selected</span>
-                        </div>
-                        
-                        <div class="flex space-x-3">
-                            <button onclick="startAssessment()" id="startAssessmentBtn" disabled class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
-                                <i class="fas fa-play mr-2"></i>Start Assessment
-                            </button>
-                            <button onclick="pauseAssessment()" id="pauseAssessmentBtn" disabled class="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
-                                <i class="fas fa-pause mr-2"></i>Pause
-                            </button>
-                            <button onclick="finishAssessment()" id="finishAssessmentBtn" disabled class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold">
-                                <i class="fas fa-check mr-2"></i>Finish
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Results Panel -->
-                    <div id="resultsPanel" class="bg-white rounded-lg shadow p-4 mt-4 hidden">
-                        <h3 class="font-bold text-gray-800 mb-3">Assessment Results</h3>
-                        <div id="resultsContent" class="space-y-2">
-                            <!-- Results populated dynamically -->
-                        </div>
-                        
-                        <div class="mt-4 flex space-x-3">
-                            <button onclick="generateReport()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg">
-                                <i class="fas fa-file-medical mr-2"></i>Generate Report
-                            </button>
-                            <button onclick="saveToEHR()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
-                                <i class="fas fa-save mr-2"></i>Save to Record
-                            </button>
-                        </div>
+                <div class="panel-body" id="panelBody">
+                    <div style="text-align:center;padding:40px 0;color:var(--muted);font-size:13px">
+                        <i class="fas fa-camera" style="font-size:28px;margin-bottom:8px;display:block;opacity:0.4"></i>
+                        Start camera to see<br>live joint analysis
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // Global variables
-        let pose = null;
-        let camera = null;
-        let isCameraRunning = false;
-        let isAssessmentRunning = false;
-        let selectedExercise = null;
-        let selectedPatient = null;
-        let assessmentData = [];
-        let recordingStartTime = null;
-        let recordingInterval = null;
-        let frameCount = 0;
-        let lastFpsTime = Date.now();
+<!-- Load new medical-grade engine -->
+<script src="/static/pose-engine-v2.js"></script>
 
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', () => {
-            loadPatients();
-            loadExercises();
-            initializePose();
+<script>
+// =============================================================================
+// Assessment State
+// =============================================================================
+const STATE = {
+    cameraType: null,
+    stream: null,
+    isRecording: false,
+    recordingStart: null,
+    recTimer: null,
+    frames: [],           // recorded skeleton frames
+    activeTab: 'joints',
+    overlays: { angles: true, rom: true, comp: true },
+    patientId: null,
+    exerciseId: null,
+    lastAngles: {},
+    lastCompensations: [],
+    lastRoms: {}
+};
+
+// =============================================================================
+// Init
+// =============================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadPatients();
+    await loadExercises();
+    checkMobile();
+});
+
+function checkMobile() {
+    if (window.innerWidth < 768) {
+        document.getElementById('mobilePanelBtn').style.display = 'flex';
+    }
+}
+
+// =============================================================================
+// Camera Setup
+// =============================================================================
+const CAMERA_TIPS = {
+    webcam: ['Place camera at hip height for full body view', 'Ensure good front lighting', 'Keep background clear'],
+    phone: ['Use rear camera for best quality', 'Mount horizontally at hip height', 'Stand 6–10 feet from camera']
+};
+
+function selectCamera(type) {
+    STATE.cameraType = type;
+    document.querySelectorAll('.cam-opt').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`opt-${type}`).classList.add('selected');
+
+    const tips = CAMERA_TIPS[type] || [];
+    document.getElementById('tipsList').innerHTML = tips.map(t => `<li>${t}</li>`).join('');
+    document.getElementById('setupTips').style.display = 'block';
+    document.getElementById('startBtn').disabled = false;
+}
+
+async function launchCamera() {
+    const btn = document.getElementById('startBtn');
+    const spinner = document.getElementById('startSpinner');
+    const icon = document.getElementById('startIcon');
+
+    btn.disabled = true;
+    spinner.classList.remove('hidden');
+    icon.classList.add('hidden');
+
+    try {
+        const constraints = {
+            video: {
+                width: { ideal: 1920, min: 1280 },
+                height: { ideal: 1080, min: 720 },
+                frameRate: { ideal: 30, min: 24 },
+                facingMode: STATE.cameraType === 'phone' ? 'environment' : 'user'
+            }
+        };
+
+        STATE.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('videoEl');
+        const canvas = document.getElementById('canvasEl');
+
+        video.srcObject = STATE.stream;
+        if (STATE.cameraType === 'webcam') video.style.transform = 'scaleX(-1)';
+        await video.play();
+
+        // Match canvas to video
+        video.addEventListener('loadedmetadata', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
         });
 
-        function initializePose() {
-            pose = new Pose({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-                }
+        // Show flip for mobile
+        if (STATE.cameraType === 'phone') document.getElementById('flipBtn').classList.remove('hidden');
+
+        // Initialize the medical-grade pose engine
+        await MedicalPoseEngine.initialize(video, canvas, onPoseResults);
+        MedicalPoseEngine.start();
+
+        // Hide setup overlay
+        document.getElementById('setupOverlay').style.display = 'none';
+        document.getElementById('recordBtn').disabled = false;
+        setStatus('ready', 'LIVE');
+
+    } catch (err) {
+        console.error('Camera error:', err);
+        alert(`Camera error: ${err.message}\n\nPlease allow camera access and try again.`);
+        btn.disabled = false;
+    } finally {
+        spinner.classList.add('hidden');
+        icon.classList.remove('hidden');
+    }
+}
+
+async function flipCamera() {
+    if (!STATE.stream) return;
+    STATE.stream.getTracks().forEach(t => t.stop());
+    const newMode = STATE.stream.getVideoTracks()[0]?.getSettings().facingMode === 'user' ? 'environment' : 'user';
+
+    STATE.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    document.getElementById('videoEl').srcObject = STATE.stream;
+}
+
+// =============================================================================
+// Pose Results Handler
+// =============================================================================
+const ctx = () => document.getElementById('canvasEl').getContext('2d');
+
+function onPoseResults(data) {
+    const { landmarks, angles, quality, roms, fps, inferenceMs, compensations: _comp } = data;
+    const canvas = document.getElementById('canvasEl');
+    const compensations = landmarks ? ClinicalBiomechanics.detectCompensations(landmarks, angles) : [];
+
+    STATE.lastAngles = angles;
+    STATE.lastRoms = roms;
+    STATE.lastCompensations = compensations;
+
+    // Render skeleton + overlays on canvas
+    ClinicalRenderer.draw(ctx(), canvas, {
+        landmarks, angles, quality, roms, fps, inferenceMs, compensations
+    }, {
+        showAngles: STATE.overlays.angles,
+        showROM: STATE.overlays.rom,
+        showCompensations: STATE.overlays.comp
+    });
+
+    // Update perf indicator
+    document.getElementById('perfInfo').textContent = `${fps}fps · ${inferenceMs}ms · Grade ${quality.grade}`;
+
+    // Record frame if active
+    if (STATE.isRecording && landmarks) {
+        STATE.frames.push({ timestamp: Date.now(), landmarks, angles });
+    }
+
+    // Update right panel
+    if (STATE.activeTab === 'joints') renderJointsPanel(angles);
+    else if (STATE.activeTab === 'rom') renderROMPanel(roms);
+}
+
+// =============================================================================
+// Recording
+// =============================================================================
+function startRecording() {
+    STATE.isRecording = true;
+    STATE.recordingStart = Date.now();
+    STATE.frames = [];
+    MedicalPoseEngine.romTracker.reset();
+
+    document.getElementById('recordBtn').classList.add('hidden');
+    document.getElementById('stopBtn').classList.remove('hidden');
+    document.getElementById('recTime').classList.remove('hidden');
+    document.getElementById('analyzeBtn').classList.add('hidden');
+    setStatus('recording', 'REC');
+
+    STATE.recTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - STATE.recordingStart) / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        document.getElementById('recTime').textContent = `${mm}:${ss}`;
+    }, 1000);
+}
+
+function stopRecording() {
+    STATE.isRecording = false;
+    clearInterval(STATE.recTimer);
+
+    document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('recordBtn').classList.remove('hidden');
+    document.getElementById('recTime').classList.add('hidden');
+    document.getElementById('analyzeBtn').classList.remove('hidden');
+    setStatus('ready', `${STATE.frames.length} frames`);
+}
+
+// =============================================================================
+// Analysis
+// =============================================================================
+async function analyzeAndShowResults() {
+    if (STATE.frames.length === 0) {
+        alert('No frames recorded. Please record a movement first.');
+        return;
+    }
+
+    setStatus('analyzing', 'ANALYZING...');
+    switchTab('results', document.querySelectorAll('.tab')[2]);
+
+    const sessionSummary = MedicalPoseEngine.getSessionSummary();
+    const allRoms = sessionSummary.roms;
+    const midFrame = STATE.frames[Math.floor(STATE.frames.length / 2)];
+    const finalCompensations = ClinicalBiomechanics.detectCompensations(midFrame.landmarks, midFrame.angles);
+
+    // Calculate overall score
+    let score = 100;
+    for (const data of Object.values(midFrame.angles)) {
+        if (data.status === 'limited') score -= 8;
+        else if (data.status === 'excessive') score -= 4;
+    }
+    score -= finalCompensations.length * 7;
+    score = Math.max(0, Math.min(100, score));
+
+    // Try to save to API
+    try {
+        if (STATE.patientId) {
+            await fetch('/api/analyze-movement', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({
+                    skeletonData: { landmarks: midFrame.landmarks },
+                    patientId: STATE.patientId,
+                    exerciseId: STATE.exerciseId,
+                    frameCount: STATE.frames.length,
+                    duration: Math.round(STATE.frames.length / 30)
+                })
             });
-
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                enableSegmentation: false,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-
-            pose.onResults(onPoseResults);
         }
+    } catch(e) { /* Offline mode – still show results */ }
 
-        function onPoseResults(results) {
-            const canvas = document.getElementById('output-canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (results.poseLandmarks) {
-                // Update detection metric
-                document.getElementById('detectionMetric').textContent = 'Detected';
-                document.getElementById('detectionMetric').style.color = '#10b981';
-                
-                // Update quality indicator
-                updateQualityIndicator(results.poseLandmarks);
-                
-                // Draw skeleton if enabled
-                if (document.getElementById('showSkeleton').checked) {
-                    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
-                    drawLandmarks(ctx, results.poseLandmarks, {color: '#FF0000', lineWidth: 1, radius: 3});
-                }
-                
-                // Calculate and display angles
-                if (document.getElementById('showAngles').checked) {
-                    calculateAngles(results.poseLandmarks, canvas);
-                }
-                
-                // Record data if assessment is running
-                if (isAssessmentRunning) {
-                    recordFrameData(results.poseLandmarks);
-                }
-            } else {
-                document.getElementById('detectionMetric').textContent = 'Not detected';
-                document.getElementById('detectionMetric').style.color = '#ef4444';
-            }
-            
-            // Update FPS
-            updateFPS();
-        }
+    renderResultsPanel(score, allRoms, finalCompensations, sessionSummary);
+    setStatus('ready', 'DONE');
+}
 
-        function updateFPS() {
-            frameCount++;
-            const now = Date.now();
-            if (now - lastFpsTime >= 1000) {
-                document.getElementById('fpsMetric').textContent = frameCount;
-                frameCount = 0;
-                lastFpsTime = now;
-            }
-        }
+// =============================================================================
+// Panel Rendering
+// =============================================================================
+function renderJointsPanel(angles) {
+    if (!angles || Object.keys(angles).length === 0) return;
+    const body = document.getElementById('panelBody');
 
-        function updateQualityIndicator(landmarks) {
-            const indicator = document.getElementById('qualityIndicator');
-            const visibleJoints = landmarks.filter(l => l.visibility > 0.5).length;
-            const totalJoints = landmarks.length;
-            const visibilityPercent = (visibleJoints / totalJoints) * 100;
-            
-            if (visibilityPercent >= 80) {
-                indicator.className = 'quality-indicator quality-good';
-                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Good Quality</span>';
-            } else if (visibilityPercent >= 50) {
-                indicator.className = 'quality-indicator quality-fair';
-                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Fair Quality</span>';
-            } else {
-                indicator.className = 'quality-indicator quality-poor';
-                indicator.innerHTML = '<i class="fas fa-circle text-xs mr-2"></i><span>Poor Visibility</span>';
-            }
-        }
+    const clinical = Object.entries(angles)
+        .filter(([name, d]) => d && d.angle !== null && !name.includes('Asymmetry'))
+        .sort((a, b) => a[0].localeCompare(b[0]));
 
-        function calculateAngles(landmarks, canvas) {
-            // Calculate knee angle (hip-knee-ankle)
-            const leftKneeAngle = calculateJointAngle(
-                landmarks[23], landmarks[25], landmarks[27]
-            );
-            const rightKneeAngle = calculateJointAngle(
-                landmarks[24], landmarks[26], landmarks[28]
-            );
-            
-            // Calculate hip angle (shoulder-hip-knee)
-            const leftHipAngle = calculateJointAngle(
-                landmarks[11], landmarks[23], landmarks[25]
-            );
-            const rightHipAngle = calculateJointAngle(
-                landmarks[12], landmarks[24], landmarks[26]
-            );
-            
-            // Update display
-            document.getElementById('kneeAngleMetric').textContent = 
-                `${Math.round((leftKneeAngle + rightKneeAngle) / 2)}°`;
-            document.getElementById('hipAngleMetric').textContent = 
-                `${Math.round((leftHipAngle + rightHipAngle) / 2)}°`;
-        }
+    const asymmetries = Object.entries(angles)
+        .filter(([name, d]) => name.includes('Asymmetry') && d && d.angle !== null);
 
-        function calculateJointAngle(a, b, c) {
-            const radians = Math.atan2(c.y - b.y, c.x - b.x) - 
-                           Math.atan2(a.y - b.y, a.x - b.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
-        }
+    body.innerHTML = `
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Joint Angles</div>
+        ${clinical.map(([name, d]) => `
+            <div class="joint-row">
+                <span class="joint-name">${name}</span>
+                <span class="joint-angle" style="color:${d.status === 'normal' ? 'var(--green)' : d.status === 'limited' ? 'var(--amber)' : 'var(--red)'}">
+                    ${d.angle !== null ? d.angle + '°' : '—'}
+                </span>
+                <span class="badge badge-${d.status}">${d.status.toUpperCase()}</span>
+            </div>
+        `).join('')}
+        ${asymmetries.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:12px 0 8px">Bilateral Asymmetry</div>
+            ${asymmetries.map(([name, d]) => `
+                <div class="joint-row">
+                    <span class="joint-name">${name.replace(' Asymmetry', '')}</span>
+                    <span class="joint-angle" style="color:${d.status === 'symmetric' ? 'var(--green)' : d.status === 'moderate' ? 'var(--amber)' : 'var(--red)'}">
+                        ${d.angle}°
+                    </span>
+                    <span class="badge badge-${d.status === 'symmetric' ? 'normal' : d.status === 'significant' ? 'excessive' : 'limited'}">${d.status.toUpperCase()}</span>
+                </div>
+            `).join('')}
+        ` : ''}
+        ${STATE.lastCompensations.length > 0 ? `
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:12px 0 8px">Compensations</div>
+            ${STATE.lastCompensations.map(c => `
+                <div class="comp-alert ${c.severity}">
+                    <i class="fas fa-exclamation-triangle" style="color:${c.severity === 'severe' ? 'var(--red)' : c.severity === 'moderate' ? '#ff6d00' : 'var(--amber)'}"></i>
+                    <span>${c.description}</span>
+                </div>
+            `).join('')}
+        ` : ''}
+    `;
+}
 
-        async function startCamera() {
-            const video = document.getElementById('input-video');
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        frameRate: { ideal: 30 }
-                    }
-                });
-                
-                video.srcObject = stream;
-                video.play();
-                
-                // Set canvas size to match video
-                video.addEventListener('loadedmetadata', () => {
-                    const canvas = document.getElementById('output-canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                });
-                
-                // Start processing frames
-                isCameraRunning = true;
-                processVideo();
-                
-                // Update UI
-                document.getElementById('startCameraBtn').classList.add('hidden');
-                document.getElementById('stopCameraBtn').classList.remove('hidden');
-                document.getElementById('captureBtn').classList.remove('hidden');
-                document.getElementById('startAssessmentBtn').disabled = false;
-                
-            } catch (error) {
-                console.error('Camera error:', error);
-                alert('Could not access camera. Please ensure camera permissions are granted.');
-            }
-        }
+function renderROMPanel(roms) {
+    if (!roms || Object.keys(roms).length === 0) {
+        document.getElementById('panelBody').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Start recording to capture ROM data</div>';
+        return;
+    }
 
-        function stopCamera() {
-            const video = document.getElementById('input-video');
-            const stream = video.srcObject;
-            
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            
-            video.srcObject = null;
-            isCameraRunning = false;
-            
-            // Update UI
-            document.getElementById('startCameraBtn').classList.remove('hidden');
-            document.getElementById('stopCameraBtn').classList.add('hidden');
-            document.getElementById('captureBtn').classList.add('hidden');
-            document.getElementById('startAssessmentBtn').disabled = true;
-        }
-
-        async function processVideo() {
-            if (!isCameraRunning) return;
-            
-            const video = document.getElementById('input-video');
-            if (video.readyState >= 2) {
-                await pose.send({image: video});
-            }
-            
-            requestAnimationFrame(processVideo);
-        }
-
-        function captureFrame() {
-            const canvas = document.getElementById('output-canvas');
-            const link = document.createElement('a');
-            link.download = `assessment-${Date.now()}.png`;
-            link.href = canvas.toDataURL();
-            link.click();
-        }
-
-        function startAssessment() {
-            if (!selectedExercise) {
-                alert('Please select an exercise first');
-                return;
-            }
-            
-            isAssessmentRunning = true;
-            assessmentData = [];
-            recordingStartTime = Date.now();
-            
-            // Update UI
-            document.getElementById('recordingIndicator').classList.remove('hidden');
-            document.getElementById('startAssessmentBtn').disabled = true;
-            document.getElementById('pauseAssessmentBtn').disabled = false;
-            document.getElementById('finishAssessmentBtn').disabled = false;
-            
-            // Start recording timer
-            recordingInterval = setInterval(() => {
-                const elapsed = Date.now() - recordingStartTime;
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                document.getElementById('recordingTime').textContent = 
-                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-
-        function pauseAssessment() {
-            isAssessmentRunning = !isAssessmentRunning;
-            const btn = document.getElementById('pauseAssessmentBtn');
-            
-            if (isAssessmentRunning) {
-                btn.innerHTML = '<i class="fas fa-pause mr-2"></i>Pause';
-            } else {
-                btn.innerHTML = '<i class="fas fa-play mr-2"></i>Resume';
-            }
-        }
-
-        function finishAssessment() {
-            isAssessmentRunning = false;
-            clearInterval(recordingInterval);
-            
-            // Update UI
-            document.getElementById('recordingIndicator').classList.add('hidden');
-            document.getElementById('pauseAssessmentBtn').disabled = true;
-            document.getElementById('finishAssessmentBtn').disabled = true;
-            document.getElementById('startAssessmentBtn').disabled = false;
-            
-            // Show results
-            showResults();
-        }
-
-        function recordFrameData(landmarks) {
-            const frameData = {
-                timestamp: Date.now(),
-                landmarks: landmarks.map(l => ({
-                    x: l.x,
-                    y: l.y,
-                    z: l.z,
-                    visibility: l.visibility
-                })),
-                kneeAngle: calculateJointAngle(landmarks[23], landmarks[25], landmarks[27]),
-                hipAngle: calculateJointAngle(landmarks[11], landmarks[23], landmarks[25])
-            };
-            
-            assessmentData.push(frameData);
-        }
-
-        function showResults() {
-            const panel = document.getElementById('resultsPanel');
-            const content = document.getElementById('resultsContent');
-            
-            // Calculate statistics
-            const kneeAngles = assessmentData.map(d => d.kneeAngle);
-            const hipAngles = assessmentData.map(d => d.hipAngle);
-            
-            const stats = {
-                duration: document.getElementById('recordingTime').textContent,
-                frames: assessmentData.length,
-                minKnee: Math.round(Math.min(...kneeAngles)),
-                maxKnee: Math.round(Math.max(...kneeAngles)),
-                avgKnee: Math.round(kneeAngles.reduce((a, b) => a + b, 0) / kneeAngles.length),
-                minHip: Math.round(Math.min(...hipAngles)),
-                maxHip: Math.round(Math.max(...hipAngles)),
-                avgHip: Math.round(hipAngles.reduce((a, b) => a + b, 0) / hipAngles.length)
-            };
-            
-            content.innerHTML = `
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-gray-50 p-3 rounded">
-                        <p class="text-sm text-gray-600">Duration</p>
-                        <p class="text-lg font-bold">${stats.duration}</p>
+    const body = document.getElementById('panelBody');
+    body.innerHTML = `
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Range of Motion (Live)</div>
+        ${Object.entries(roms).map(([name, rom]) => {
+            const pct = Math.min(100, (rom.range / 180) * 100);
+            const color = rom.range > 100 ? 'var(--green)' : rom.range > 60 ? 'var(--amber)' : 'var(--red)';
+            return `
+                <div class="rom-row">
+                    <div class="rom-label">
+                        <span>${name}</span>
+                        <span>${rom.min}° – ${rom.max}° <strong style="color:${color}">(${rom.range}°)</strong></span>
                     </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <p class="text-sm text-gray-600">Frames Captured</p>
-                        <p class="text-lg font-bold">${stats.frames}</p>
-                    </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <p class="text-sm text-gray-600">Knee ROM</p>
-                        <p class="text-lg font-bold">${stats.minKnee}° - ${stats.maxKnee}°</p>
-                    </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <p class="text-sm text-gray-600">Hip ROM</p>
-                        <p class="text-lg font-bold">${stats.minHip}° - ${stats.maxHip}°</p>
+                    <div class="rom-bar-bg">
+                        <div class="rom-bar-fill" style="width:${pct}%;background:${color}"></div>
                     </div>
                 </div>
             `;
-            
-            panel.classList.remove('hidden');
-        }
+        }).join('')}
+    `;
+}
 
-        async function loadPatients() {
-            try {
-                const response = await fetch('/api/patients');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const select = document.getElementById('patientSelect');
-                    data.data.forEach(p => {
-                        const option = document.createElement('option');
-                        option.value = p.id;
-                        option.textContent = `${p.first_name} ${p.last_name}`;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading patients:', error);
-            }
-        }
+function renderResultsPanel(score, roms, compensations, sessionSummary) {
+    const scoreColor = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+    const body = document.getElementById('panelBody');
 
-        async function loadExercises() {
-            try {
-                const response = await fetch('/api/exercises');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const container = document.getElementById('exerciseList');
-                    container.innerHTML = data.data.map(ex => `
-                        <div class="exercise-btn p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50"
-                             onclick="selectExercise('${ex.id}', '${ex.name}')">
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center mr-3">
-                                    <i class="fas fa-dumbbell text-indigo-600 text-sm"></i>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-gray-800">${ex.name}</p>
-                                    <p class="text-xs text-gray-500">${ex.category} • ${ex.difficulty}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Error loading exercises:', error);
-            }
-        }
+    body.innerHTML = `
+        <div class="results-section" style="text-align:center">
+            <div class="score-circle" style="border-color:${scoreColor};margin:16px auto">
+                <span class="score-num" style="color:${scoreColor}">${score}</span>
+                <span class="score-label">Score</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted)">${sessionSummary.totalFrames} frames · ~${sessionSummary.durationEstimate}s</div>
+        </div>
 
-        function selectExercise(id, name) {
-            selectedExercise = { id, name };
-            document.getElementById('selectedExercise').textContent = name;
-            
-            // Update UI
-            document.querySelectorAll('.exercise-btn').forEach(btn => {
-                btn.classList.remove('active');
+        ${Object.keys(roms).length > 0 ? `
+            <div class="results-section">
+                <h3>Range of Motion</h3>
+                ${Object.entries(roms).map(([name, rom]) => `
+                    <div class="joint-row">
+                        <span class="joint-name">${name}</span>
+                        <span class="joint-angle" style="color:${rom.range > 100 ? 'var(--green)' : rom.range > 60 ? 'var(--amber)' : 'var(--red)'}">${rom.range}°</span>
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
+
+        ${compensations.length > 0 ? `
+            <div class="results-section">
+                <h3>Compensations Found</h3>
+                ${compensations.map(c => `
+                    <div class="comp-alert ${c.severity}">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>${c.description}</span>
+                    </div>
+                `).join('')}
+            </div>
+        ` : `
+            <div style="text-align:center;padding:16px;color:var(--green);font-size:13px">
+                <i class="fas fa-check-circle" style="font-size:24px;display:block;margin-bottom:6px"></i>
+                No compensations detected
+            </div>
+        `}
+
+        <div style="margin-top:16px;display:grid;gap:8px">
+            <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="printReport()">
+                <i class="fas fa-file-medical"></i> Generate Report
+            </button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="resetSession()">
+                <i class="fas fa-redo"></i> New Assessment
+            </button>
+        </div>
+    `;
+}
+
+// =============================================================================
+// UI Helpers
+// =============================================================================
+function setStatus(type, text) {
+    const pill = document.getElementById('statusPill');
+    pill.textContent = text;
+    pill.className = `status-pill ${type}`;
+}
+
+function switchTab(name, el) {
+    STATE.activeTab = name;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    if (name === 'rom') renderROMPanel(STATE.lastRoms);
+    else if (name === 'joints') renderJointsPanel(STATE.lastAngles);
+}
+
+function toggleOverlay(key, btn) {
+    STATE.overlays[key] = !STATE.overlays[key];
+    btn.classList.toggle('active', STATE.overlays[key]);
+}
+
+function resetSession() {
+    MedicalPoseEngine.stop();
+    if (STATE.stream) STATE.stream.getTracks().forEach(t => t.stop());
+
+    STATE.stream = null;
+    STATE.isRecording = false;
+    STATE.frames = [];
+    clearInterval(STATE.recTimer);
+
+    document.getElementById('setupOverlay').style.display = 'flex';
+    document.getElementById('videoEl').srcObject = null;
+    document.getElementById('recordBtn').classList.remove('hidden');
+    document.getElementById('recordBtn').disabled = true;
+    document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('analyzeBtn').classList.add('hidden');
+    document.getElementById('recTime').classList.add('hidden');
+    document.querySelectorAll('.cam-opt').forEach(e => e.classList.remove('selected'));
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('flipBtn').classList.add('hidden');
+    document.getElementById('panelBody').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--muted);font-size:13px"><i class="fas fa-camera" style="font-size:28px;margin-bottom:8px;display:block;opacity:0.4"></i>Start camera to see<br>live joint analysis</div>';
+    setStatus('ready', 'READY');
+}
+
+function openMobilePanel() {
+    document.getElementById('rightPanel').classList.toggle('mobile-show');
+}
+
+function printReport() {
+    window.print();
+}
+
+// =============================================================================
+// Data Loading
+// =============================================================================
+async function loadPatients() {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/patients', { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+        const data = await res.json();
+        const sel = document.getElementById('patientSelect');
+        if (data.success && data.data) {
+            data.data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.first_name} ${p.last_name}`;
+                sel.appendChild(opt);
             });
-            event.currentTarget.classList.add('active');
-            
-            if (isCameraRunning) {
-                document.getElementById('startAssessmentBtn').disabled = false;
-            }
         }
+    } catch(e) { /* offline ok */ }
+}
 
-        function generateReport() {
-            alert('Report generation would create a PDF with assessment data, charts, and recommendations.');
+async function loadExercises() {
+    try {
+        const res = await fetch('/api/exercises');
+        const data = await res.json();
+        const sel = document.getElementById('exerciseSelect');
+        if (data.success && data.data) {
+            data.data.slice(0, 30).forEach(ex => {
+                const opt = document.createElement('option');
+                opt.value = ex.id;
+                opt.textContent = ex.exercise_name || ex.name;
+                sel.appendChild(opt);
+            });
         }
+    } catch(e) { /* offline ok */ }
+}
 
-        function saveToEHR() {
-            alert('Assessment data would be saved to the patient\'s electronic health record.');
-        }
-    </script>
+function onPatientChange(id) { STATE.patientId = id; }
+function onExerciseChange(id) { STATE.exerciseId = id; }
+</script>
 </body>
 </html>
