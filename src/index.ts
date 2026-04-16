@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { MOCK_PATIENTS, EXERCISE_LIBRARY } from './mockData.js';
+import mskRouter from './routes/msk-analysis.js';
 
 const app = new Hono();
 
@@ -12,6 +13,11 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization']
 }));
+
+// ============================================================================
+// SPECIALIST AGENT ROUTES
+// ============================================================================
+app.route('/api/msk-analysis', mskRouter);
 
 // ============================================================================
 // HEALTH CHECK

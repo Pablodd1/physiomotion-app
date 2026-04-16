@@ -1,7 +1,66 @@
 // ============================================================================
-// Multi-Agent Brain Orchestrator
+// Multi-Agent Brain Orchestrator v2.0
+// Body-Region Specialist Swarm for Medical-Grade MSK Assessment
 // Coordinates specialist agents for PhysioMotion & DealFlow
 // ============================================================================
+
+// Body regions that agents can specialize in
+type BodyRegion =
+  | 'cervical_spine'
+  | 'thoracic_lumbar'
+  | 'upper_extremity_left'
+  | 'upper_extremity_right'
+  | 'lower_extremity_left'
+  | 'lower_extremity_right'
+  | 'full_body'
+  | 'none';
+
+// Movement tests and which body regions they activate
+const MOVEMENT_REGION_MAP: Record<string, BodyRegion[]> = {
+  'deep_squat':        ['thoracic_lumbar', 'lower_extremity_left', 'lower_extremity_right'],
+  'overhead_squat':    ['cervical_spine', 'thoracic_lumbar', 'upper_extremity_left', 'upper_extremity_right', 'lower_extremity_left', 'lower_extremity_right'],
+  'hurdle_step':       ['thoracic_lumbar', 'lower_extremity_left', 'lower_extremity_right'],
+  'inline_lunge':      ['thoracic_lumbar', 'lower_extremity_left', 'lower_extremity_right'],
+  'shoulder_mobility': ['cervical_spine', 'upper_extremity_left', 'upper_extremity_right'],
+  'active_slr':        ['thoracic_lumbar', 'lower_extremity_left', 'lower_extremity_right'],
+  'trunk_pushup':      ['cervical_spine', 'thoracic_lumbar', 'upper_extremity_left', 'upper_extremity_right'],
+  'rotary_stability':  ['cervical_spine', 'thoracic_lumbar', 'upper_extremity_left', 'upper_extremity_right', 'lower_extremity_left', 'lower_extremity_right'],
+  'gait_analysis':     ['full_body'],
+  'single_leg_stance': ['thoracic_lumbar', 'lower_extremity_left', 'lower_extremity_right'],
+};
+
+// Normative ROM tables per body region (degrees)
+const NORMATIVE_ROM: Record<string, Record<string, [number, number]>> = {
+  'cervical_spine': {
+    'cervical_flexion': [0, 50], 'cervical_extension': [0, 60],
+    'cervical_lateral_flexion': [0, 45], 'cervical_rotation': [0, 80]
+  },
+  'thoracic_lumbar': {
+    'trunk_flexion': [0, 80], 'trunk_extension': [0, 25],
+    'trunk_lateral_flexion': [0, 35], 'trunk_rotation': [0, 45],
+    'lumbar_lordosis': [20, 45]
+  },
+  'upper_extremity_left': {
+    'shoulder_flexion': [0, 180], 'shoulder_abduction': [0, 180],
+    'shoulder_internal_rotation': [0, 70], 'shoulder_external_rotation': [0, 90],
+    'elbow_flexion': [0, 150], 'wrist_flexion': [0, 80], 'wrist_extension': [0, 70]
+  },
+  'upper_extremity_right': {
+    'shoulder_flexion': [0, 180], 'shoulder_abduction': [0, 180],
+    'shoulder_internal_rotation': [0, 70], 'shoulder_external_rotation': [0, 90],
+    'elbow_flexion': [0, 150], 'wrist_flexion': [0, 80], 'wrist_extension': [0, 70]
+  },
+  'lower_extremity_left': {
+    'hip_flexion': [0, 120], 'hip_extension': [0, 30], 'hip_abduction': [0, 45],
+    'hip_internal_rotation': [0, 40], 'hip_external_rotation': [0, 45],
+    'knee_flexion': [0, 135], 'ankle_dorsiflexion': [0, 20], 'ankle_plantarflexion': [0, 50]
+  },
+  'lower_extremity_right': {
+    'hip_flexion': [0, 120], 'hip_extension': [0, 30], 'hip_abduction': [0, 45],
+    'hip_internal_rotation': [0, 40], 'hip_external_rotation': [0, 45],
+    'knee_flexion': [0, 135], 'ankle_dorsiflexion': [0, 20], 'ankle_plantarflexion': [0, 50]
+  }
+};
 
 interface Agent {
   id: string;
@@ -11,6 +70,9 @@ interface Agent {
   confidenceThreshold: number;
   priority: number;
   enabled: boolean;
+  bodyRegion: BodyRegion;            // NEW: Which body area this agent owns
+  normativeROM?: Record<string, [number, number]>;  // NEW: Agent-specific norms
+  landmarkKeys?: string[];           // NEW: MediaPipe landmarks this agent reads
 }
 
 interface AgentMessage {
@@ -42,56 +104,140 @@ interface ConsensusResult {
   debateRounds: number;
 }
 
-// Agent Registry - Specialist Definitions
+// ============================================================================
+// Agent Registry — Body-Region Specialist Swarm
+// ============================================================================
+
 const AGENT_REGISTRY: Record<string, Agent> = {
-  // PhysioMotion Agents
-  'biomechanics': {
-    id: 'biomechanics',
-    name: 'Biomechanics Agent',
-    role: 'Joint angle analysis, ROM calculations, mesoskeleton modeling',
-    capabilities: ['pose_analysis', 'joint_angles', 'rom_calculation', 'symmetry_check'],
+
+  // ── PhysioMotion: Extremity & Region Specialists ──────────────────────────
+
+  'cervical-spine': {
+    id: 'cervical-spine',
+    name: 'Cervical Spine Agent',
+    role: 'Head/neck posture, cervical ROM, forward head posture detection, upper trapezius tension',
+    capabilities: ['cervical_rom', 'head_posture', 'neck_compensation', 'upper_trap_tension'],
+    confidenceThreshold: 0.88,
+    priority: 1,
+    enabled: true,
+    bodyRegion: 'cervical_spine',
+    normativeROM: NORMATIVE_ROM['cervical_spine'],
+    landmarkKeys: ['nose', 'left_ear', 'right_ear', 'left_eye', 'right_eye', 'left_shoulder', 'right_shoulder']
+  },
+
+  'thoracic-lumbar': {
+    id: 'thoracic-lumbar',
+    name: 'Thoracic/Lumbar Spine Agent',
+    role: 'Trunk flexion/extension, lateral bending, rotation, core stability assessment, pelvic tilt',
+    capabilities: ['trunk_rom', 'core_stability', 'pelvic_tilt', 'spinal_alignment', 'trunk_compensation'],
     confidenceThreshold: 0.85,
     priority: 1,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'thoracic_lumbar',
+    normativeROM: NORMATIVE_ROM['thoracic_lumbar'],
+    landmarkKeys: ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip']
   },
+
+  'upper-extremity-left': {
+    id: 'upper-extremity-left',
+    name: 'Left Upper Extremity Agent',
+    role: 'Left shoulder ROM, elbow flexion/extension, wrist mobility, overhead reach',
+    capabilities: ['shoulder_rom', 'elbow_rom', 'wrist_rom', 'overhead_reach', 'upper_symmetry'],
+    confidenceThreshold: 0.86,
+    priority: 2,
+    enabled: true,
+    bodyRegion: 'upper_extremity_left',
+    normativeROM: NORMATIVE_ROM['upper_extremity_left'],
+    landmarkKeys: ['left_shoulder', 'left_elbow', 'left_wrist', 'left_pinky', 'left_index', 'left_thumb']
+  },
+
+  'upper-extremity-right': {
+    id: 'upper-extremity-right',
+    name: 'Right Upper Extremity Agent',
+    role: 'Right shoulder ROM, elbow flexion/extension, wrist mobility, overhead reach',
+    capabilities: ['shoulder_rom', 'elbow_rom', 'wrist_rom', 'overhead_reach', 'upper_symmetry'],
+    confidenceThreshold: 0.86,
+    priority: 2,
+    enabled: true,
+    bodyRegion: 'upper_extremity_right',
+    normativeROM: NORMATIVE_ROM['upper_extremity_right'],
+    landmarkKeys: ['right_shoulder', 'right_elbow', 'right_wrist', 'right_pinky', 'right_index', 'right_thumb']
+  },
+
+  'lower-extremity-left': {
+    id: 'lower-extremity-left',
+    name: 'Left Lower Extremity Agent',
+    role: 'Left hip ROM, knee flexion/valgus, ankle dorsiflexion, heel lift, weight bearing',
+    capabilities: ['hip_rom', 'knee_rom', 'ankle_rom', 'valgus_detection', 'heel_lift', 'lower_symmetry'],
+    confidenceThreshold: 0.87,
+    priority: 1,
+    enabled: true,
+    bodyRegion: 'lower_extremity_left',
+    normativeROM: NORMATIVE_ROM['lower_extremity_left'],
+    landmarkKeys: ['left_hip', 'left_knee', 'left_ankle', 'left_heel', 'left_foot_index']
+  },
+
+  'lower-extremity-right': {
+    id: 'lower-extremity-right',
+    name: 'Right Lower Extremity Agent',
+    role: 'Right hip ROM, knee flexion/valgus, ankle dorsiflexion, heel lift, weight bearing',
+    capabilities: ['hip_rom', 'knee_rom', 'ankle_rom', 'valgus_detection', 'heel_lift', 'lower_symmetry'],
+    confidenceThreshold: 0.87,
+    priority: 1,
+    enabled: true,
+    bodyRegion: 'lower_extremity_right',
+    normativeROM: NORMATIVE_ROM['lower_extremity_right'],
+    landmarkKeys: ['right_hip', 'right_knee', 'right_ankle', 'right_heel', 'right_foot_index']
+  },
+
+  // ── Cross-Cutting PhysioMotion Agents (kept from v1) ──────────────────────
+
   'balance': {
     id: 'balance',
-    name: 'Balance Agent',
-    role: 'Posture analysis, sway detection, stability metrics',
+    name: 'Balance & Stability Agent',
+    role: 'Center of pressure, sway ellipse, weight distribution, single-leg stability',
     capabilities: ['posture_analysis', 'sway_detection', 'weight_distribution', 'stability_score'],
     confidenceThreshold: 0.80,
-    priority: 2,
-    enabled: true
+    priority: 3,
+    enabled: true,
+    bodyRegion: 'full_body'
   },
+
   'predictor': {
     id: 'predictor',
     name: 'Risk Predictor Agent',
-    role: 'Re-injury risk forecasting, progression prediction',
+    role: 'Re-injury risk forecasting, progression prediction, recovery timeline',
     capabilities: ['risk_forecast', 'injury_prediction', 'progression_analysis', 'outcome_prediction'],
     confidenceThreshold: 0.75,
-    priority: 3,
-    enabled: true
+    priority: 4,
+    enabled: true,
+    bodyRegion: 'full_body'
   },
+
   'comparative': {
     id: 'comparative',
     name: 'Comparative Analysis Agent',
-    role: 'Norm comparison, history tracking, trend analysis',
-    capabilities: ['norm_comparison', 'history_analysis', 'trend_detection', 'benchmarking'],
+    role: 'Normative comparison, bilateral symmetry scoring, longitudinal trend analysis',
+    capabilities: ['norm_comparison', 'history_analysis', 'trend_detection', 'benchmarking', 'symmetry_check'],
     confidenceThreshold: 0.80,
-    priority: 4,
-    enabled: true
+    priority: 5,
+    enabled: true,
+    bodyRegion: 'full_body'
   },
+
   'exercise-rx': {
     id: 'exercise-rx',
     name: 'Exercise Prescription Agent',
     role: 'PT protocol generation, exercise selection, progression planning',
     capabilities: ['exercise_selection', 'protocol_generation', 'progression_planning', 'contraindication_check'],
     confidenceThreshold: 0.85,
-    priority: 5,
-    enabled: true
+    priority: 6,
+    enabled: true,
+    bodyRegion: 'full_body'
   },
-  
-  // DealFlow Agents
+
+  // ── DealFlow Agents ────────────────────────────────────────────────────────
+
   'legal-research': {
     id: 'legal-research',
     name: 'Legal Research Agent',
@@ -99,7 +245,8 @@ const AGENT_REGISTRY: Record<string, Agent> = {
     capabilities: ['case_law_search', 'statute_analysis', 'precedent_matching', 'circuit_split_detection'],
     confidenceThreshold: 0.90,
     priority: 1,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
   'document-parser': {
     id: 'document-parser',
@@ -108,7 +255,8 @@ const AGENT_REGISTRY: Record<string, Agent> = {
     capabilities: ['contract_analysis', 'term_extraction', 'clause_identification', 'risk_flagging'],
     confidenceThreshold: 0.88,
     priority: 2,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
   'strategy': {
     id: 'strategy',
@@ -117,7 +265,8 @@ const AGENT_REGISTRY: Record<string, Agent> = {
     capabilities: ['case_theory', 'claim_recommendation', 'defense_analysis', 'settlement_advice'],
     confidenceThreshold: 0.85,
     priority: 3,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
   'outcome-predictor': {
     id: 'outcome-predictor',
@@ -126,10 +275,12 @@ const AGENT_REGISTRY: Record<string, Agent> = {
     capabilities: ['win_probability', 'settlement_range', 'litigation_analytics', 'judge_history'],
     confidenceThreshold: 0.75,
     priority: 4,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
-  
-  // Shared Agents
+
+  // ── Shared Agents ──────────────────────────────────────────────────────────
+
   'research': {
     id: 'research',
     name: 'Research Agent',
@@ -137,25 +288,28 @@ const AGENT_REGISTRY: Record<string, Agent> = {
     capabilities: ['web_search', 'literature_retrieval', 'rag_update', 'fact_check'],
     confidenceThreshold: 0.85,
     priority: 1,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
   'critic': {
     id: 'critic',
     name: 'Critic Agent',
-    role: 'QA validation, consistency checking, error detection',
-    capabilities: ['qa_validation', 'consistency_check', 'error_detection', 'confidence_scoring'],
+    role: 'QA validation, cross-agent conflict resolution, confidence calibration',
+    capabilities: ['qa_validation', 'consistency_check', 'error_detection', 'confidence_scoring', 'conflict_resolution'],
     confidenceThreshold: 0.90,
     priority: 10,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   },
   'memory': {
     id: 'memory',
     name: 'Memory Agent',
-    role: 'Long-term context, patient/client history, pattern recall',
-    capabilities: ['context_retrieval', 'history_recall', 'pattern_recognition', 'preference_memory'],
+    role: 'Long-term context, patient history, pattern recall, encrypted embedding retrieval',
+    capabilities: ['context_retrieval', 'history_recall', 'pattern_recognition', 'preference_memory', 'encrypted_search'],
     confidenceThreshold: 0.95,
     priority: 0,
-    enabled: true
+    enabled: true,
+    bodyRegion: 'none'
   }
 };
 
@@ -191,7 +345,12 @@ class BrainOrchestrator {
   // Get agents by app context
   getAgentsForApp(app: 'physiomotion' | 'dealflow'): Agent[] {
     const appPrefixes: Record<string, string[]> = {
-      'physiomotion': ['biomechanics', 'balance', 'predictor', 'comparative', 'exercise-rx'],
+      'physiomotion': [
+        'cervical-spine', 'thoracic-lumbar',
+        'upper-extremity-left', 'upper-extremity-right',
+        'lower-extremity-left', 'lower-extremity-right',
+        'balance', 'predictor', 'comparative', 'exercise-rx'
+      ],
       'dealflow': ['legal-research', 'document-parser', 'strategy', 'outcome-predictor']
     };
     
@@ -201,6 +360,27 @@ class BrainOrchestrator {
     return [...specific, ...shared]
       .map(id => this.agents.get(id))
       .filter((a): a is Agent => a !== undefined && a.enabled);
+  }
+
+  // NEW: Get agents relevant to a specific movement test
+  getAgentsForMovement(movementTest: string): Agent[] {
+    const regions = MOVEMENT_REGION_MAP[movementTest];
+    if (!regions) return this.getAgentsForApp('physiomotion');
+
+    // 'full_body' means activate all region agents
+    if (regions.includes('full_body')) {
+      return Array.from(this.agents.values())
+        .filter(a => a.enabled && a.bodyRegion !== 'none');
+    }
+
+    // Activate only the region-specific agents + cross-cutting agents
+    return Array.from(this.agents.values())
+      .filter(a => a.enabled && (
+        regions.includes(a.bodyRegion as BodyRegion) ||
+        a.bodyRegion === 'full_body' ||
+        ['critic', 'memory'].includes(a.id)
+      ))
+      .sort((a, b) => a.priority - b.priority);
   }
   
   // ============================================================================
@@ -258,45 +438,55 @@ class BrainOrchestrator {
   // Agent Selection & Dispatch
   // ============================================================================
   
-  private selectAgentsForTask(task: { app: string; type: string }): Agent[] {
+  private selectAgentsForTask(task: { app: string; type: string; input?: any }): Agent[] {
+    // If the task specifies a movement test, use body-region routing
+    const movementTest = task.input?.assessmentType || task.input?.movementTest;
+    if (task.app === 'physiomotion' && movementTest && MOVEMENT_REGION_MAP[movementTest]) {
+      console.log(`   🗺️  Body-region routing for: ${movementTest}`);
+      const regionAgents = this.getAgentsForMovement(movementTest);
+      console.log(`   📍 Activated regions: ${regionAgents.map(a => a.bodyRegion).filter((v, i, s) => s.indexOf(v) === i).join(', ')}`);
+      return regionAgents.slice(0, 8); // Allow up to 8 specialist agents
+    }
+
+    // Fallback: capability-based routing
     const capabilityMap: Record<string, string[]> = {
       // PhysioMotion tasks
-      'pose_analysis': ['biomechanics', 'balance', 'comparative'],
-      'movement_assessment': ['biomechanics', 'predictor', 'comparative'],
-      'risk_assessment': ['predictor', 'comparative', 'biomechanics'],
-      'exercise_prescription': ['exercise-rx', 'biomechanics', 'predictor'],
-      'progress_review': ['comparative', 'predictor', 'exercise-rx'],
+      'pose_analysis': ['cervical_rom', 'trunk_rom', 'hip_rom', 'knee_rom', 'ankle_rom', 'posture_analysis'],
+      'movement_assessment': ['hip_rom', 'knee_rom', 'ankle_rom', 'trunk_rom', 'valgus_detection', 'core_stability'],
+      'risk_assessment': ['risk_forecast', 'norm_comparison', 'hip_rom', 'knee_rom'],
+      'exercise_prescription': ['exercise_selection', 'hip_rom', 'knee_rom', 'risk_forecast'],
+      'progress_review': ['norm_comparison', 'trend_detection', 'exercise_selection'],
       
       // DealFlow tasks
-      'document_review': ['document-parser', 'legal-research', 'strategy'],
-      'case_analysis': ['strategy', 'legal-research', 'outcome-predictor'],
-      'legal_research': ['legal-research', 'research'],
-      'litigation_strategy': ['strategy', 'outcome-predictor', 'legal-research'],
-      'settlement_advice': ['outcome-predictor', 'strategy'],
+      'document_review': ['contract_analysis', 'case_law_search', 'case_theory'],
+      'case_analysis': ['case_theory', 'case_law_search', 'win_probability'],
+      'legal_research': ['case_law_search', 'web_search'],
+      'litigation_strategy': ['case_theory', 'win_probability', 'case_law_search'],
+      'settlement_advice': ['win_probability', 'case_theory'],
       
       // Shared tasks
-      'fact_check': ['research', 'critic'],
-      'general_query': ['research', 'memory']
+      'fact_check': ['web_search', 'qa_validation'],
+      'general_query': ['web_search', 'context_retrieval']
     };
     
-    const capabilities = capabilityMap[task.type] || ['research'];
+    const capabilities = capabilityMap[task.type] || ['web_search'];
     const selected = new Set<Agent>();
     
     capabilities.forEach(cap => {
       this.findAgentsByCapability(cap).forEach(agent => {
-        if (task.app === 'physiomotion' && 
-            ['legal-research', 'document-parser', 'strategy', 'outcome-predictor'].includes(agent.id)) {
-          return; // Skip legal agents for physio
+        if (task.app === 'physiomotion' && agent.bodyRegion === 'none' &&
+            !['research', 'critic', 'memory'].includes(agent.id)) {
+          return; // Skip non-physio agents
         }
-        if (task.app === 'dealflow' && 
-            ['biomechanics', 'balance', 'predictor', 'comparative', 'exercise-rx'].includes(agent.id)) {
+        if (task.app === 'dealflow' && agent.bodyRegion !== 'none' &&
+            !['research', 'critic', 'memory'].includes(agent.id)) {
           return; // Skip physio agents for legal
         }
         selected.add(agent);
       });
     });
     
-    return Array.from(selected).slice(0, 5); // Max 5 agents
+    return Array.from(selected).slice(0, 8); // Max 8 agents (scaled for region swarm)
   }
   
   private async dispatchToAgent(
@@ -484,20 +674,91 @@ class BrainOrchestrator {
     context: any
   ): Promise<{ data: any; confidence: number; reasoning: string }> {
     // In production: Call Gemini/Gemma API with agent-specific prompts
+    // Each body-region agent returns ROM findings scoped to its landmarks
     
-    const appSpecificResponses: Record<string, Record<string, any>> = {
-      'biomechanics': {
-        data: { kneeValgus: 8.2, hipFlexion: 95, ankleDorsiflexion: 12 },
-        reasoning: 'Analyzed pose landmarks against normative data for ACLR patients'
+    const regionResponses: Record<string, Record<string, any>> = {
+      // ── Body Region Specialists ──
+      'cervical-spine': {
+        data: {
+          region: 'cervical_spine',
+          cervical_flexion: 42, cervical_extension: 55,
+          cervical_lateral_flexion_L: 40, cervical_lateral_flexion_R: 38,
+          forward_head_posture_offset_cm: 3.2,
+          compensations: ['slight forward head posture'],
+          rom_status: { cervical_flexion: 'normal', cervical_extension: 'normal' }
+        },
+        reasoning: 'Analyzed ear-shoulder-nose triangle for cervical alignment. Forward head posture measured at 3.2cm anterior to plumb line.'
       },
+      'thoracic-lumbar': {
+        data: {
+          region: 'thoracic_lumbar',
+          trunk_flexion: 72, trunk_extension: 20,
+          trunk_lateral_flexion_L: 30, trunk_lateral_flexion_R: 28,
+          pelvic_tilt_degrees: 12, lumbar_lordosis: 35,
+          core_stability_score: 68,
+          compensations: ['excessive forward trunk lean', 'mild anterior pelvic tilt'],
+          rom_status: { trunk_flexion: 'normal', trunk_extension: 'limited' }
+        },
+        reasoning: 'Measured shoulder-hip-knee angles for trunk lean. Pelvic tilt derived from ASIS-PSIS angle estimation via hip landmarks.'
+      },
+      'upper-extremity-left': {
+        data: {
+          region: 'upper_extremity_left', side: 'left',
+          shoulder_flexion: 165, shoulder_abduction: 170,
+          elbow_flexion: 140, wrist_extension: 65,
+          compensations: [],
+          rom_status: { shoulder_flexion: 'normal', elbow_flexion: 'normal' }
+        },
+        reasoning: 'Left upper extremity ROM within normal limits. No compensatory patterns detected.'
+      },
+      'upper-extremity-right': {
+        data: {
+          region: 'upper_extremity_right', side: 'right',
+          shoulder_flexion: 158, shoulder_abduction: 162,
+          elbow_flexion: 138, wrist_extension: 62,
+          compensations: ['mild shoulder hiking on overhead reach'],
+          rom_status: { shoulder_flexion: 'normal', elbow_flexion: 'normal' }
+        },
+        reasoning: 'Right shoulder flexion 7° less than left. Upper trapezius compensation noted during overhead movement.'
+      },
+      'lower-extremity-left': {
+        data: {
+          region: 'lower_extremity_left', side: 'left',
+          hip_flexion: 95, hip_abduction: 38,
+          knee_flexion: 118, knee_valgus_degrees: 4.1,
+          ankle_dorsiflexion: 14, heel_lift: false,
+          compensations: ['mild knee valgus'],
+          rom_status: { hip_flexion: 'normal', knee_flexion: 'limited', ankle_dorsiflexion: 'limited' }
+        },
+        reasoning: 'Left knee valgus 4.1° detected via knee-ankle-hip alignment. Ankle dorsiflexion below 20° norm.'
+      },
+      'lower-extremity-right': {
+        data: {
+          region: 'lower_extremity_right', side: 'right',
+          hip_flexion: 92, hip_abduction: 35,
+          knee_flexion: 115, knee_valgus_degrees: 8.2,
+          ankle_dorsiflexion: 12, heel_lift: true,
+          compensations: ['significant knee valgus', 'heel lifting during squat'],
+          rom_status: { hip_flexion: 'limited', knee_flexion: 'limited', ankle_dorsiflexion: 'limited' }
+        },
+        reasoning: 'Right knee valgus 8.2° — clinically significant. Heel lift confirms ankle dorsiflexion deficit. Hip flexion 3° below left side → bilateral asymmetry.'
+      },
+
+      // ── Cross-Cutting Agents ──
       'balance': {
-        data: { swayArea: 125, centerOfPressure: { x: 0.02, y: -0.05 } },
-        reasoning: 'Calculated sway ellipse from 30-second quiet stance'
+        data: { swayArea: 125, centerOfPressure: { x: 0.02, y: -0.05 }, stabilityScore: 72 },
+        reasoning: 'Calculated sway ellipse from 30-second quiet stance. Mild posterior-lateral shift detected.'
       },
       'predictor': {
-        data: { reInjuryRisk: 0.68, timeline: '6 months', factors: ['valgus', 'asymmetry'] },
-        reasoning: 'Regression model using 5 biomechanical factors + patient history'
+        data: { reInjuryRisk: 0.68, timeline: '6 months', factors: ['right_knee_valgus', 'bilateral_ankle_deficit', 'core_instability'] },
+        reasoning: 'Risk model using regional agent findings: right knee valgus (8.2°) + bilateral ankle dorsiflexion deficit dominates risk score.'
       },
+      'comparative': {
+        data: { bilateralAsymmetries: { knee_valgus: 4.1, hip_flexion: 3, ankle_dorsiflexion: 2 }, trendDirection: 'improving', sessionsAnalyzed: 5 },
+        reasoning: 'Compared current session against 5 prior assessments. Right-side deficits improving but still clinically significant.'
+      },
+
+      // ── DealFlow Agents ──
       'legal-research': {
         data: { precedents: 3, relevantStatutes: ['INA § 245(a)'], circuitSplit: false },
         reasoning: 'Searched Westlaw + PACER for similar adjustment of status cases'
@@ -507,17 +768,17 @@ class BrainOrchestrator {
         reasoning: 'Parsed I-485 and I-140 for critical terms and inconsistencies'
       },
       'critic': {
-        data: { validation: 'passed', concerns: [] },
-        reasoning: 'Cross-checked findings against source material'
+        data: { validation: 'passed', concerns: [], conflictsResolved: 0 },
+        reasoning: 'Cross-checked regional agent findings. No inter-agent conflicts detected.'
       }
     };
     
     const defaultResponse = {
-      data: { status: 'processed', agent: agent.id },
+      data: { status: 'processed', agent: agent.id, region: agent.bodyRegion },
       reasoning: `Executed ${agent.role.toLowerCase()}`
     };
     
-    const response = appSpecificResponses[agent.id] || defaultResponse;
+    const response = regionResponses[agent.id] || defaultResponse;
     
     // Add slight randomness to confidence for realism
     const baseConfidence = agent.confidenceThreshold;
@@ -573,57 +834,80 @@ class BrainOrchestrator {
 
 export const Brain = new BrainOrchestrator();
 
+// Export types and constants for other modules
+export { MOVEMENT_REGION_MAP, NORMATIVE_ROM };
+export type { BodyRegion, Agent, TaskResult, ConsensusResult };
+
 // Example usage (for testing)
 export async function demoBrain() {
-  console.log('\n' + '='.repeat(60));
-  console.log('🧠 MULTI-AGENT BRAIN ORCHESTRATOR DEMO');
-  console.log('='.repeat(60));
+  console.log('\n' + '='.repeat(70));
+  console.log('🧠 MULTI-AGENT BRAIN ORCHESTRATOR v2.0 — BODY REGION SWARM');
+  console.log('='.repeat(70));
   
-  // Demo 1: PhysioMotion - Movement Assessment
-  console.log('\n📊 DEMO 1: PhysioMotion Movement Assessment');
-  const physioResult = await Brain.executeTask({
+  // Demo 1: Deep Squat — activates thoracic-lumbar + both lower-extremity agents
+  console.log('\n📊 DEMO 1: Deep Squat Assessment (Region-Routed)');
+  const squat = await Brain.executeTask({
     app: 'physiomotion',
     type: 'movement_assessment',
     input: {
       patientId: 'patient-123',
-      assessmentType: 'squat',
-      landmarks: [], // Would be actual MediaPipe data
+      assessmentType: 'deep_squat',
+      landmarks: [],
       videoDuration: 45
     },
     requiredConfidence: 0.80,
     enableDebate: true
   });
   
-  console.log('\n   Final Result:');
-  console.log(`   - Consensus: ${(physioResult.consensusConfidence * 100).toFixed(1)}%`);
-  console.log(`   - Agents agreed: ${physioResult.agreed}`);
-  console.log(`   - Debate rounds: ${physioResult.debateRounds}`);
-  console.log(`   - Key finding: Knee valgus ${physioResult.finalAnswer?.kneeValgus}°`);
+  console.log('\n   Squat Results:');
+  console.log(`   - Consensus: ${(squat.consensusConfidence * 100).toFixed(1)}%`);
+  console.log(`   - Agents activated: ${squat.results.length}`);
+  console.log(`   - Regions analyzed: ${squat.results.map(r => r.result?.region || r.agentId).join(', ')}`);
+  console.log(`   - Right knee valgus: ${squat.results.find(r => r.agentId === 'lower-extremity-right')?.result?.knee_valgus_degrees}°`);
+  console.log(`   - Core stability: ${squat.results.find(r => r.agentId === 'thoracic-lumbar')?.result?.core_stability_score}/100`);
   
-  // Demo 2: DealFlow - Document Review
-  console.log('\n⚖️  DEMO 2: DealFlow Document Review');
-  const legalResult = await Brain.executeTask({
-    app: 'dealflow',
-    type: 'document_review',
+  // Demo 2: Overhead Squat — activates ALL 6 region agents
+  console.log('\n📊 DEMO 2: Overhead Squat (Full Body — 6 Region Agents)');
+  const overhead = await Brain.executeTask({
+    app: 'physiomotion',
+    type: 'movement_assessment',
     input: {
-      clientId: 'client-456',
-      documentType: 'I-485',
-      content: 'Adjustment of status application...'
+      patientId: 'patient-123',
+      assessmentType: 'overhead_squat',
+      landmarks: [],
+      videoDuration: 60
+    },
+    requiredConfidence: 0.80,
+    enableDebate: false
+  });
+  
+  console.log(`   - Agents activated: ${overhead.results.length}`);
+  console.log(`   - All regions: ${overhead.results.map(r => r.result?.region || r.agentId).join(', ')}`);
+  
+  // Demo 3: Shoulder Mobility — activates cervical-spine + both upper-extremity agents
+  console.log('\n📊 DEMO 3: Shoulder Mobility (Upper Body Focus)');
+  const shoulder = await Brain.executeTask({
+    app: 'physiomotion',
+    type: 'movement_assessment',
+    input: {
+      patientId: 'patient-123',
+      assessmentType: 'shoulder_mobility',
+      landmarks: [],
+      videoDuration: 30
     },
     requiredConfidence: 0.85,
     enableDebate: true
   });
   
-  console.log('\n   Final Result:');
-  console.log(`   - Consensus: ${(legalResult.consensusConfidence * 100).toFixed(1)}%`);
-  console.log(`   - Agents agreed: ${legalResult.agreed}`);
-  console.log(`   - Key risks: ${legalResult.finalAnswer?.risks?.join(', ') || 'None flagged'}`);
+  console.log(`   - Agents activated: ${shoulder.results.length}`);
+  console.log(`   - Right shoulder flexion: ${shoulder.results.find(r => r.agentId === 'upper-extremity-right')?.result?.shoulder_flexion}°`);
+  console.log(`   - Left shoulder flexion: ${shoulder.results.find(r => r.agentId === 'upper-extremity-left')?.result?.shoulder_flexion}°`);
   
-  console.log('\n' + '='.repeat(60));
-  console.log('✅ DEMO COMPLETE');
-  console.log('='.repeat(60));
+  console.log('\n' + '='.repeat(70));
+  console.log('✅ DEMO COMPLETE — All body regions analyzed by specialist agents');
+  console.log('='.repeat(70));
   
-  return { physioResult, legalResult };
+  return { squat, overhead, shoulder };
 }
 
 // Run demo if executed directly
