@@ -347,9 +347,14 @@ export function performBiomechanicalAnalysis(skeleton: SkeletonData): Biomechani
   return {
     joint_angles: Object.values(jointAngles),
     movement_quality_score: movementQualityScore,
+    stability_score: 100 - (compensations.length * 10), // Mock stability score
     detected_compensations: compensations,
+    compensation_detected: compensations.length > 0,
     recommendations,
-    deficiencies
+    deficiencies,
+    rom_measurements: jointAngles,
+    left_right_asymmetry: asymmetries,
+    analysis_text: `Movement quality score of ${movementQualityScore}/100 with ${compensations.length} compensations detected.`
   };
 }
 

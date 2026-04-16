@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "outDir": "./dist",
     "rootDir": ".",
     "strict": false,
@@ -13,22 +13,17 @@
     "allowJs": true,
     "noImplicitAny": false,
     "lib": ["ES2022", "DOM"],
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx"
   },
   "include": [
-    "src/index.ts",
-    "src/mockData.ts",
+    "src/**/*",
+    "index.ts",
     "server.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "femto_bridge",
-    "src/middleware",
-    "src/routes",
-    "src/utils",
-    "src/renderer.tsx",
-    "src/database.ts",
-    "src/types.ts"
+    "dist"
   ]
 }

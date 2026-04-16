@@ -7,6 +7,7 @@
     "dev": "tsx index.ts",
     "build": "echo 'No build needed - runs directly with tsx'",
     "start": "tsx index.ts",
+    "init-db": "node scripts/init-db.js",
     "railway": "npm start",
     "test": "curl http://localhost:3000/api/health"
   },
@@ -14,14 +15,18 @@
     "@google/generative-ai": "^0.2.0",
     "@hono/node-server": "^1.13.8",
     "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
     "hono": "^4.10.1",
+    "pg": "^8.20.0",
     "three": "^0.160.0",
     "tsx": "^4.19.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260416.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.2.1",
+    "@types/pg": "^8.20.0",
     "@types/three": "^0.160.0",
     "typescript": "^5.0.0"
   },

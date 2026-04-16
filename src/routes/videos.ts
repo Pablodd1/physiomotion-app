@@ -62,28 +62,9 @@ videos.post('/upload', async (c) => {
     const fileExtension = videoFile.name.split('.').pop()
     const storageKey = `videos/${patientId}/${videoType}/${timestamp}_${Math.random().toString(36).substring(7)}.${fileExtension}`
 
-    // Store in R2 if available, otherwise store metadata only
+    // Note: Video storage is currently metadata-only on Railway. 
+    // In production, integrate with S3 or local persistent storage.
     let storageUrl = null
-    if (c.env?.R2) {
-      try {
-        // Convert File to ArrayBuffer for R2
-        const arrayBuffer = await videoFile.arrayBuffer()
-        await c.env.R2.put(storageKey, arrayBuffer, {
-          httpMetadata: {
-            contentType: videoFile.type,
-          },
-          customMetadata: {
-            patientId: patientId.toString(),
-            uploadedBy: clinician?.id?.toString() || 'unknown',
-            uploadedAt: new Date().toISOString(),
-          }
-        })
-        storageUrl = `${c.env.R2_PUBLIC_URL || ''}/${storageKey}`
-      } catch (r2Error: any) {
-        console.error('[VIDEO] R2 upload error:', r2Error.message)
-        // Continue to save metadata even if R2 fails
-      }
-    }
 
     // Save video metadata to database
     const result = await pool.query(
@@ -100,14 +81,14 @@ videos.post('/upload', async (c) => {
         videoType,
         title || videoFile.name,
         description || null,
-        c.env?.R2 ? 'r2' : 'local',
+        'database',
         storageKey,
         storageUrl,
         videoFile.size,
-        null, // duration - would need to parse video
-        null, // resolution - would need to parse video
+        null, // duration
+        null, // resolution
         assessmentId,
-        'pending'
+        'completed'
       ]
     )
 
@@ -200,14 +181,7 @@ videos.get('/:id', async (c) => {
     }
 
     const video = result.rows[0]
-
-    // Generate signed URL if using R2 (if implemented)
-    let playbackUrl = video.storage_url
-    if (c.env?.R2 && video.storage_key) {
-      // In production, you would generate a signed URL here
-      // For now, we use the public URL if available
-      playbackUrl = video.storage_url
-    }
+    const playbackUrl = video.storage_url
 
     return c.json({
       success: true,
@@ -247,16 +221,6 @@ videos.delete('/:id', async (c) => {
     }
 
     const video = videoResult.rows[0]
-
-    // Delete from R2 if applicable
-    if (c.env?.R2 && video.storage_key) {
-      try {
-        await c.env.R2.delete(video.storage_key)
-      } catch (r2Error: any) {
-        console.error('[VIDEO] R2 delete error:', r2Error.message)
-        // Continue to delete metadata even if R2 fails
-      }
-    }
 
     // Delete from database
     await pool.query('DELETE FROM videos WHERE id = $1', [id])

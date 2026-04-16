@@ -181,9 +181,10 @@ app.get('/api/cameras', async (c) => {
 })
 
 // Static files and SPA fallback (must be LAST)
-app.use('/assets/*', serveStatic({ root: './dist' }))
-app.use('/favicon.png', serveStatic({ path: './dist/favicon.png' }))
-app.use('*', serveStatic({ root: './dist', index: 'index.html' }))
+app.use('/assets/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/favicon.png', serveStatic({ path: './public/favicon.png' }))
+app.use('*', serveStatic({ root: './public', index: 'dashboard.html' }))
 
 console.log(`[INIT] Total routes registered: ${app.routes.length}`)
 

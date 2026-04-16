@@ -127,7 +127,7 @@ function buildObjective(
 
   // Joint Angle Findings
   lines.push('**Range of Motion Findings:**');
-  const jointAngles = Object.values(analysis.deficiencies || []);
+  const jointAngles = analysis.deficiencies || [];
   
   if (jointAngles.length > 0) {
     for (const def of jointAngles.slice(0, 5)) {

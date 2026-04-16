@@ -1,25 +1,15 @@
 // TypeScript Type Definitions for Medical Movement Assessment Platform
 
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
-
-// Database adapter interface that works with both D1 and PostgreSQL
-export interface DatabaseAdapter {
-  prepare: (query: string) => {
-    bind: (...args: any[]) => {
-      first: <T = any>() => Promise<T | null>;
-      all: <T = any>() => Promise<{ results: T[]; success: boolean; meta: { last_row_id: number | null } }>;
-      run: () => Promise<{ success: boolean; meta: { last_row_id: number | null } }>;
-    };
-    first: <T = any>() => Promise<T | null>;
-    all: <T = any>() => Promise<{ results: T[]; success: boolean; meta: { last_row_id: number | null } }>;
-    run: () => Promise<{ success: boolean; meta: { last_row_id: number | null } }>;
-  };
-}
+// Database pool type for PostgreSQL
+import type { Pool } from 'pg';
 
 export type Bindings = {
-  DB: D1Database | DatabaseAdapter;
-  R2?: R2Bucket;
-  KV?: KVNamespace;
+  DATABASE_URL?: string;
+  JWT_SECRET?: string;
+  GEMINI_API_KEY?: string;
+  ALLOWED_ORIGINS?: string;
+  NODE_ENV?: string;
+  R2_PUBLIC_URL?: string;
 }
 
 // ============================================================================
@@ -472,6 +462,7 @@ export type ClinicalJointAngle = JointAngle;
 export interface BiomechanicalAnalysis {
   joint_angles: JointAngle[];
   movement_quality_score: number; // 0-100
+  stability_score?: number;
   detected_compensations: string[];
   recommendations: string[];
   deficiencies: Array<{
@@ -480,6 +471,10 @@ export interface BiomechanicalAnalysis {
     description: string;
     recommended_exercises: number[]; // exercise_ids
   }>;
+  rom_measurements?: Record<string, any>;
+  left_right_asymmetry?: Record<string, any>;
+  compensation_detected?: boolean;
+  analysis_text?: string;
 }
 
 // ============================================================================
@@ -492,8 +487,10 @@ export type Variables = {
     email: string;
     role: string;
     clinic_id?: number;
+    npi_number?: string;
   };
   clinicianId?: number;
+  patientId?: number;
   validatedData?: any;
   validatedId?: number;
 }

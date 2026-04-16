@@ -1,13 +1,13 @@
 // Centralized error handling for API
 import type { MiddlewareHandler } from 'hono'
-import { safeLog } from './hipaa'
+import { hipaaLogger } from './hipaa'
 
 // Simple wrapper to catch errors in route handlers
 export const errorHandler: MiddlewareHandler = async (c, next) => {
   try {
     return await next()
   } catch (err: any) {
-    safeLog.error('Unhandled server error', err as Error, {
+    hipaaLogger.error('Unhandled server error', err as Error, {
       path: c.req?.path,
       method: c.req?.method
     })
