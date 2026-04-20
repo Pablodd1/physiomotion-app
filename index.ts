@@ -5,7 +5,7 @@ import * as dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 console.log(`[PHYSIOMOTION] Starting Unified API Server...`);
 console.log(`[PHYSIOMOTION] Port: ${port}`);

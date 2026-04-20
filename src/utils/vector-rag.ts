@@ -555,14 +555,7 @@ function textSimilarityScore(text: string, queryEmbedding: number[]): number {
   return 0.3 + combined * 0.5; // Range 0.3-0.8
 }
 
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
+
 
 /**
  * Re-rank guidelines by similarity to agent findings embedding.

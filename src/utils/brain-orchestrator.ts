@@ -909,8 +909,3 @@ export async function demoBrain() {
   
   return { squat, overhead, shoulder };
 }
-
-// Run demo if executed directly
-if (require.main === module) {
-  demoBrain().catch(console.error);
-}
